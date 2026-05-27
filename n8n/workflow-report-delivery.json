@@ -1,0 +1,193 @@
+{
+  "name": "BFC — Report Delivery (Email + SMS)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bfc-report-delivery",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "POST body: { user_id (uuid), client_id (text), client_email, report_type, report_month (YYYY-MM-DD) }"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "schema": "public",
+        "tableName": "user_notification_preferences",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "keyValue": "={{$json[\"body\"][\"user_id\"]}}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "name": "Supabase — Fetch User Prefs",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prefs = $input.first().json;\nconst wb    = $('Webhook').first().json.body;\n\nreturn [{\n  json: {\n    user_id:         wb.user_id,\n    client_id:       wb.client_id,\n    client_email:    wb.client_email,\n    report_type:     wb.report_type,\n    report_month:    wb.report_month,\n    delivery_method: prefs.delivery_method ?? 'email',\n    phone_number:    prefs.phone_number    ?? null,\n  }\n}];"
+      },
+      "name": "Code — Normalize Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env[\"NEXT_PUBLIC_SITE_URL\"]}}/api/auth/evidence-link",
+        "options": {},
+        "notes": "Requires HTTP Header Auth credential pointing to your service-role key. Configure credential in n8n before activating."
+      },
+      "name": "HTTP Request — Magic Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data     = $('Code — Normalize Data').first().json;\nconst linkData = $input.first().json;\n\nconst expiresAt = new Date();\nexpiresAt.setMinutes(expiresAt.getMinutes() + 30);\n\nreturn [{\n  json: {\n    ...data,\n    magic_link:            linkData.url   ?? null,\n    magic_link_expires_at: expiresAt.toISOString(),\n  }\n}];"
+      },
+      "name": "Code — Add Magic Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json[\"delivery_method\"]}}",
+        "rules": {
+          "rules": [
+            { "value2": "email" },
+            { "value2": "sms"   },
+            { "value2": "both"  }
+          ]
+        }
+      },
+      "name": "Switch — Delivery Method",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1350, 300],
+      "notes": "Output 0 = email | Output 1 = sms | Output 2 = both (fans to Mailgun AND Vonage)"
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications@blackflowcodeai.com",
+        "toEmail":   "={{$node[\"Code — Add Magic Link\"].json[\"client_email\"]}}",
+        "subject":   "=Your BFC {{$node[\"Code — Add Magic Link\"].json[\"report_type\"]}} Report is Ready",
+        "text":      "=Hello,\n\nYour BFC compliance report is ready to view:\n\n{{$node[\"Code — Add Magic Link\"].json[\"magic_link\"]}}\n\nThis link expires in 30 minutes.\n\n— BFC Compliance Team",
+        "options":   {}
+      },
+      "name": "Mailgun — Send Email",
+      "type": "n8n-nodes-base.mailgun",
+      "typeVersion": 1,
+      "position": [1570, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rest.nexmo.com/sms/json",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "api_key",    "value": "={{$env[\"VONAGE_API_KEY\"]}}"    },
+            { "name": "api_secret", "value": "={{$env[\"VONAGE_API_SECRET\"]}}" },
+            { "name": "to",         "value": "={{$node[\"Code — Add Magic Link\"].json[\"phone_number\"]}}" },
+            { "name": "from",       "value": "={{$env[\"VONAGE_FROM_NUMBER\"]}}" },
+            { "name": "text",       "value": "=BFC: Your {{$node[\"Code — Add Magic Link\"].json[\"report_type\"]}} report is ready. View (expires 30 min): {{$node[\"Code — Add Magic Link\"].json[\"magic_link\"]}}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "HTTP Request — Vonage SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1570, 440]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Code — Add Magic Link').first().json;\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            true,\n    email_provider:        'mailgun',\n    sms_sent:              false,\n    status:                'Sent',\n    n8n_execution_id:      $execution.id,\n  }\n}];"
+      },
+      "name": "Code — Prep Email Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1790, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d      = $('Code — Add Magic Link').first().json;\nconst vonage = $input.first().json;\nconst msg    = vonage?.messages?.[0];\nconst ok     = msg?.status === '0';\n\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            false,\n    sms_sent:              ok,\n    sms_provider:          'vonage',\n    status:                ok ? 'Sent' : 'Failed',\n    failure_reason:        ok ? null : (msg?.['error-text'] ?? 'Unknown Vonage error'),\n    n8n_execution_id:      $execution.id,\n  }\n}];"
+      },
+      "name": "Code — Prep SMS Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1790, 440]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "schema": "public",
+        "tableName": "report_delivery_log"
+      },
+      "name": "Supabase — Log Delivery",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2010, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Supabase — Fetch User Prefs", "type": "main", "index": 0 }]]
+    },
+    "Supabase — Fetch User Prefs": {
+      "main": [[{ "node": "Code — Normalize Data", "type": "main", "index": 0 }]]
+    },
+    "Code — Normalize Data": {
+      "main": [[{ "node": "HTTP Request — Magic Link", "type": "main", "index": 0 }]]
+    },
+    "HTTP Request — Magic Link": {
+      "main": [[{ "node": "Code — Add Magic Link", "type": "main", "index": 0 }]]
+    },
+    "Code — Add Magic Link": {
+      "main": [[{ "node": "Switch — Delivery Method", "type": "main", "index": 0 }]]
+    },
+    "Switch — Delivery Method": {
+      "main": [
+        [{ "node": "Mailgun — Send Email",      "type": "main", "index": 0 }],
+        [{ "node": "HTTP Request — Vonage SMS", "type": "main", "index": 0 }],
+        [
+          { "node": "Mailgun — Send Email",      "type": "main", "index": 0 },
+          { "node": "HTTP Request — Vonage SMS", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Mailgun — Send Email": {
+      "main": [[{ "node": "Code — Prep Email Log", "type": "main", "index": 0 }]]
+    },
+    "HTTP Request — Vonage SMS": {
+      "main": [[{ "node": "Code — Prep SMS Log", "type": "main", "index": 0 }]]
+    },
+    "Code — Prep Email Log": {
+      "main": [[{ "node": "Supabase — Log Delivery", "type": "main", "index": 0 }]]
+    },
+    "Code — Prep SMS Log": {
+      "main": [[{ "node": "Supabase — Log Delivery", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": ["bfc-compliance"]
+}
