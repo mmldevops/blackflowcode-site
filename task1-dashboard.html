@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 1 — TD Banking User Dashboard</title>
+<style>
+:root{
+  --red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;
+  --white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;
+  --green:#10B981;--amber:#F59E0B;--purple:#7C3AED;--pink:#EC4899;
+  --sh:0 2px 12px rgba(0,0,0,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--dark);height:54px;display:flex;align-items:center;padding:0 20px;gap:14px;border-bottom:3px solid var(--red);position:sticky;top:0;z-index:200;}
+.logo-m{width:30px;height:30px;background:var(--red);border-radius:6px;display:grid;place-items:center;font-weight:900;color:#fff;font-size:15px;flex-shrink:0;}
+.tb-title{color:#fff;font-size:13px;font-weight:700;}
+.tb-sep{width:1px;height:18px;background:rgba(255,255,255,.18);}
+.tb-sub{color:#94A3B8;font-size:12px;}
+.tb-space{flex:1;}
+.tb-tag{background:rgba(237,29,36,.2);color:#FCA5A5;font-size:11px;font-weight:700;padding:3px 11px;border-radius:16px;}
+.tb-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#CBD5E0;font-size:11px;padding:5px 13px;border-radius:16px;cursor:pointer;}
+.tb-btn:hover{background:rgba(255,255,255,.14);}
+.tb-dot{width:7px;height:7px;border-radius:50%;background:#10B981;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* ── NAV ── */
+.navrow{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;display:flex;gap:2px;overflow-x:auto;position:sticky;top:54px;z-index:190;}
+.navrow::-webkit-scrollbar{height:3px;}
+.ntab{padding:12px 14px;font-size:12px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;user-select:none;display:flex;align-items:center;gap:5px;transition:color .15s;}
+.ntab.active{color:var(--red);border-bottom-color:var(--red);}
+.ntab:hover:not(.active){color:var(--text);}
+.ntab .badge{background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;}
+
+/* ── FILTER BAR ── */
+.fbar{background:var(--white);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.fbar label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;}
+.fbar select,.fbar input{border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:12px;background:var(--bg);outline:none;}
+.fbar select:focus,.fbar input:focus{border-color:var(--blue);}
+.apply{background:var(--red);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.reset{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;}
+.fspace{flex:1;}
+.stamp{font-size:11px;color:var(--muted);}
+.srch{position:relative;}
+.srch input{padding-left:26px;width:170px;}
+.srch::before{content:'🔍';position:absolute;left:7px;top:50%;transform:translateY(-50%);font-size:11px;pointer-events:none;}
+
+/* ── PAGES ── */
+.page{display:none;padding:20px;max-width:1440px;margin:0 auto;}
+.page.active{display:block;}
+
+/* ── KPI ROW ── */
+.kpis{display:grid;gap:14px;margin-bottom:20px;}
+.kpi{background:var(--white);border-radius:10px;padding:16px;border:1px solid var(--border);box-shadow:var(--sh);position:relative;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 5px 18px rgba(0,0,0,.1);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.k-r::before{background:var(--red);}
+.k-b::before{background:var(--blue);}
+.k-g::before{background:var(--green);}
+.k-a::before{background:var(--amber);}
+.k-p::before{background:var(--purple);}
+.k-d::before{background:var(--dark);}
+.k-pk::before{background:var(--pink);}
+.kpi .lbl{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px;}
+.kpi .val{font-size:24px;font-weight:800;color:var(--dark);}
+.kpi .sub{font-size:11px;color:var(--muted);margin-top:5px;}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;}
+.t-g{background:#DCFCE7;color:#16A34A;}
+.t-r{background:#FEE2E2;color:#DC2626;}
+.t-n{background:#F1F5F9;color:#64748B;}
+.t-a{background:#FEF3C7;color:#D97706;}
+
+/* ── PANELS ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid21{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px;}
+.full{margin-bottom:18px;}
+.panel{background:var(--white);border-radius:10px;padding:18px;border:1px solid var(--border);box-shadow:var(--sh);}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+.ph h4{font-size:13px;font-weight:700;color:var(--dark);}
+.pa{font-size:11px;color:var(--blue);cursor:pointer;font-weight:600;background:none;border:none;}
+.pa:hover{text-decoration:underline;}
+
+/* ── LOB MINI TABS ── */
+.lob-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.lob-tab{padding:4px 12px;border-radius:16px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:all .15s;}
+.lt-all{background:var(--dark);color:#fff;}
+.lt-sbb{background:#EFF6FF;color:#2563EB;border-color:#BFDBFE;}
+.lt-sbcat{background:#F5F3FF;color:#7C3AED;border-color:#DDD6FE;}
+.lt-tr{background:#ECFDF5;color:#059669;border-color:#A7F3D0;}
+.lt-ci{background:#FEF3C7;color:#D97706;border-color:#FDE68A;}
+.lob-tab.active-lob{box-shadow:0 0 0 2px currentColor;}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;}
+table.dt{width:100%;border-collapse:collapse;font-size:12px;}
+table.dt th{background:var(--dark);color:#fff;padding:9px 11px;font-size:11px;font-weight:600;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;}
+table.dt th:hover{background:#2d2d4e;}
+table.dt th .si{margin-left:4px;opacity:.4;font-size:10px;}
+table.dt th.asc .si::after{content:'▲';}
+table.dt th.desc .si::after{content:'▼';}
+table.dt th:not(.asc):not(.desc) .si::after{content:'⇅';}
+table.dt td{padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:middle;}
+table.dt tr:hover td{background:#F8FAFF;}
+.fw{font-weight:600;color:var(--dark);}
+.mono{font-family:'Cascadia Code','Consolas',monospace;font-size:11px;color:var(--muted);}
+.chip{display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+.c-active{background:#DCFCE7;color:#16A34A;}
+.c-inactive{background:#F1F5F9;color:#94A3B8;}
+.c-dormant{background:#FEE2E2;color:#DC2626;}
+.lob-sbb{background:#EFF6FF;color:#2563EB;}
+.lob-sc{background:#F5F3FF;color:#7C3AED;}
+.lob-tr{background:#ECFDF5;color:#059669;}
+.lob-ci{background:#FEF3C7;color:#D97706;}
+
+/* ── AVATAR ── */
+.urow{display:flex;align-items:center;gap:8px;}
+.av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0;}
+.un{font-weight:600;color:var(--dark);font-size:12px;}
+.ue{font-size:11px;color:var(--muted);}
+
+/* ── RISK PILL ── */
+.risk{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:9px;font-size:10px;font-weight:700;}
+.risk-h{background:#FEE2E2;color:#DC2626;}
+.risk-m{background:#FEF3C7;color:#D97706;}
+.risk-l{background:#DCFCE7;color:#16A34A;}
+
+/* ── SCORE BAR ── */
+.srow{display:flex;align-items:center;gap:7px;}
+.sbar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.sfill{height:100%;border-radius:3px;}
+.snum{font-size:11px;font-weight:700;width:26px;text-align:right;}
+
+/* ── PERMISSION MATRIX ── */
+.tbl-wrap{overflow-x:auto;}
+table.pm{width:100%;border-collapse:collapse;font-size:11px;}
+table.pm th{background:var(--bg);color:var(--muted);padding:7px 10px;font-size:10px;font-weight:700;border:1px solid var(--border);text-align:center;}
+table.pm td{padding:7px 10px;border:1px solid var(--border);text-align:center;}
+table.pm .pname{text-align:left;font-weight:600;color:var(--dark);background:#fff;min-width:150px;}
+.cell-y{background:#DCFCE7;color:#16A34A;font-weight:700;}
+.cell-n{background:#F8FAFC;color:#CBD5E0;}
+.cell-warn{background:#FEE2E2;color:#DC2626;font-weight:700;}
+.cell-cnt{background:#EFF6FF;color:#2563EB;font-weight:700;}
+.cell-risk-h{background:#FEE2E2;color:#DC2626;font-weight:800;}
+.cell-risk-m{background:#FEF3C7;color:#D97706;font-weight:800;}
+.cell-risk-l{background:#DCFCE7;color:#16A34A;font-weight:800;}
+
+/* ── ROLE TREE ── */
+.role-node{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;cursor:pointer;transition:background .12s;}
+.role-node:hover{background:var(--bg);}
+.rni{font-size:13px;}
+.rnm{font-size:12px;font-weight:600;}
+.rnc{margin-left:auto;font-size:11px;font-weight:700;background:var(--bg);color:var(--muted);padding:1px 6px;border-radius:7px;}
+.rnl{font-size:10px;padding:1px 6px;border-radius:5px;font-weight:600;}
+.rl1{padding-left:10px;} .rl1 .rnm{color:var(--red);}
+.rl2{padding-left:26px;}
+.rl3{padding-left:44px;}
+
+/* ── HEATMAP ── */
+.hm-grid{display:grid;grid-template-columns:repeat(13,1fr);gap:3px;margin-top:8px;}
+.hm{height:13px;border-radius:2px;cursor:pointer;transition:transform .1s;}
+.hm:hover{transform:scale(1.3);}
+.hm0{background:#F1F5F9;} .hm1{background:#BFDBFE;} .hm2{background:#60A5FA;} .hm3{background:#2563EB;} .hm4{background:#1D4ED8;}
+
+/* ── DONUT ── */
+.dring{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.dl{display:flex;flex-direction:column;gap:7px;}
+.dli{display:flex;align-items:center;gap:7px;}
+.dd{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.dn{font-size:12px;color:var(--muted);}
+.dv{font-size:12px;font-weight:700;color:var(--dark);margin-left:auto;}
+
+/* ── BAR CHART ── */
+.barchart{display:flex;align-items:flex-end;gap:8px;padding:0 2px;}
+.bw{display:flex;flex-direction:column;align-items:center;flex:1;height:100%;}
+.bspc{flex:1;}
+.bcol{width:100%;border-radius:4px 4px 0 0;}
+.blbl{font-size:10px;color:var(--muted);margin-top:4px;text-align:center;line-height:1.3;}
+.bval{font-size:10px;font-weight:700;color:var(--dark);margin-bottom:2px;}
+
+/* ── COMPLIANCE ── */
+.chk-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);margin-bottom:7px;cursor:pointer;transition:background .12s;}
+.chk-item:hover{background:var(--bg);}
+.chk-pass{background:#F0FDF4;border-color:#BBF7D0;}
+.chk-fail{background:#FEF2F2;border-color:#FECACA;}
+.chk-warn{background:#FFFBEB;border-color:#FDE68A;}
+.chk-ico{font-size:15px;}
+.chk-txt{font-size:12px;font-weight:600;flex:1;}
+.chk-lob{font-size:10px;color:var(--muted);white-space:nowrap;}
+
+/* ── PROFILE COMPARE ── */
+.compare-select{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.compare-select select{border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;flex:1;background:var(--bg);}
+.diff-row-match td{background:#F0FDF4;}
+.diff-row-diff td{background:#FEF2F2;}
+
+/* ── PAGINATION ── */
+.pgn{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:11px;border-top:1px solid var(--border);}
+.pgn span{font-size:12px;color:var(--muted);}
+.pgn-btns{display:flex;gap:3px;}
+.pb{width:27px;height:27px;border-radius:6px;border:1px solid var(--border);background:var(--white);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.pb:hover{background:var(--bg);}
+.pb.act{background:var(--red);color:#fff;border-color:var(--red);}
+
+/* ── NO DATA ── */
+.nodata{text-align:center;padding:30px;color:var(--muted);font-size:13px;}
+
+/* CODE */
+.code{background:#1E1E2E;color:#CDD6F4;font-family:'Cascadia Code','Consolas',monospace;font-size:11px;padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.6;margin-top:8px;}
+.kw{color:#89DCEB;}.str{color:#A6E3A1;}.cm{color:#585b70;}
+
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+@media(max-width:1000px){
+  .grid2,.grid21,.grid3{grid-template-columns:1fr;}
+  .kpis{grid-template-columns:repeat(3,1fr)!important;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo-m">M</div>
+  <span class="tb-title">Blackflow Cloud · TD Banking</span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub">Task 1 — Users · Profiles · Roles · Permissions · Teams</span>
+  <div class="tb-space"></div>
+  <span class="tb-tag">MID-REVIEW · MAY 26</span>
+  <div class="tb-dot"></div>
+  <button class="tb-btn" onclick="exportCSV()">⬇ Export</button>
+  <button class="tb-btn" onclick="window.print()">🖨 Print</button>
+</div>
+
+<!-- NAV TABS -->
+<div class="navrow">
+  <div class="ntab active" data-tab="overview" onclick="switchTab(this,'overview')">🏠 Overview</div>
+  <div class="ntab" data-tab="users"    onclick="switchTab(this,'users')">👥 User Directory</div>
+  <div class="ntab" data-tab="perms"    onclick="switchTab(this,'perms')">🔐 Profiles &amp; Permissions</div>
+  <div class="ntab" data-tab="roles"    onclick="switchTab(this,'roles')">🗺 Role Hierarchy</div>
+  <div class="ntab" data-tab="template" onclick="switchTab(this,'template')">📋 Profile Templates</div>
+  <div class="ntab" data-tab="login"    onclick="switchTab(this,'login')">🕐 Login Activity</div>
+  <div class="ntab" data-tab="risk"     onclick="switchTab(this,'risk')">⚠ Risk &amp; Compliance <span class="badge" id="risk-badge">29</span></div>
+  <div class="ntab" data-tab="team"     onclick="switchTab(this,'team')">🏦 Team Management</div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="fbar">
+  <label>LOB</label>
+  <select id="f-lob" onchange="applyFilters()">
+    <option value="">All LOBs</option>
+    <option>SBB</option><option>SBCAT</option>
+    <option>Treasury</option><option>CIE LOD</option>
+  </select>
+  <label>Status</label>
+  <select id="f-status" onchange="applyFilters()">
+    <option value="">All</option>
+    <option>Active</option><option>Inactive</option><option>Dormant</option>
+  </select>
+  <label>Profile</label>
+  <select id="f-profile" onchange="applyFilters()">
+    <option value="">All Profiles</option>
+    <option>SBB Standard</option><option>SBB Manager</option>
+    <option>SBCAT Analyst</option><option>SBCAT Manager</option>
+    <option>Treasury Analyst</option><option>Treasury Admin</option>
+    <option>CIE LOD Standard</option><option>System Administrator</option>
+  </select>
+  <div class="srch"><input type="text" id="f-search" placeholder="Name or email…" oninput="applyFilters()"></div>
+  <button class="reset" onclick="resetFilters()">✕ Reset</button>
+  <button class="apply" onclick="applyFilters()">Apply</button>
+  <div class="fspace"></div>
+  <span class="stamp">Source: Salesforce Reports · May 14, 2026 · 08:15 AM</span>
+</div>
+
+<!-- ══════ PAGE: OVERVIEW ══════ -->
+<div class="page active" id="page-overview">
+  <div class="kpis" style="grid-template-columns:repeat(7,1fr);" id="kpi-row">
+    <div class="kpi k-b" onclick="filterByLob('')">
+      <div class="lbl">Total Users</div><div class="val" id="k-total">2,847</div>
+      <div class="sub"><span class="tag t-n">All LOBs</span></div>
+    </div>
+    <div class="kpi k-g" onclick="filterByStatus('Active')">
+      <div class="lbl">Active</div><div class="val" id="k-active">2,641</div>
+      <div class="sub"><span class="tag t-g" id="k-active-pct">92.8%</span></div>
+    </div>
+    <div class="kpi k-r" onclick="filterByStatus('Dormant')">
+      <div class="lbl">Dormant 90d+</div><div class="val" id="k-dormant">134</div>
+      <div class="sub"><span class="tag t-r">Action needed</span></div>
+    </div>
+    <div class="kpi k-a">
+      <div class="lbl">Profiles</div><div class="val">18</div>
+      <div class="sub"><span class="tag t-n">4 LOBs</span></div>
+    </div>
+    <div class="kpi k-p">
+      <div class="lbl">Permission Sets</div><div class="val">47</div>
+      <div class="sub"><span class="tag t-a">▲ +3 new</span></div>
+    </div>
+    <div class="kpi k-d">
+      <div class="lbl">Roles Defined</div><div class="val">62</div>
+      <div class="sub"><span class="tag t-n">5 levels</span></div>
+    </div>
+    <div class="kpi k-pk" onclick="filterByRisk('High')">
+      <div class="lbl">High-Risk Users</div><div class="val" id="k-risk">29</div>
+      <div class="sub"><span class="tag t-r">Review required</span></div>
+    </div>
+  </div>
+
+  <div class="grid21">
+    <!-- User table -->
+    <div class="panel">
+      <div class="ph">
+        <h4>👥 User Overview <span style="font-size:11px;font-weight:400;color:var(--muted)" id="user-count"></span></h4>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="pa" onclick="exportCSV()">Export →</button>
+        </div>
+      </div>
+      <div class="lob-tabs" id="lob-tab-row">
+        <div class="lob-tab lt-all active-lob" onclick="lobTabClick(this,'')">All LOBs</div>
+        <div class="lob-tab lt-sbb" onclick="lobTabClick(this,'SBB')">SBB</div>
+        <div class="lob-tab lt-sbcat" onclick="lobTabClick(this,'SBCAT')">SBCAT</div>
+        <div class="lob-tab lt-tr" onclick="lobTabClick(this,'Treasury')">Treasury</div>
+        <div class="lob-tab lt-ci" onclick="lobTabClick(this,'CIE LOD')">CIE LOD</div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="dt" id="user-table">
+          <thead><tr>
+            <th onclick="sortTable('user-table',0)">User<span class="si"></span></th>
+            <th onclick="sortTable('user-table',1)">LOB<span class="si"></span></th>
+            <th onclick="sortTable('user-table',2)">Profile<span class="si"></span></th>
+            <th onclick="sortTable('user-table',3)">Role<span class="si"></span></th>
+            <th onclick="sortTable('user-table',4)">Status<span class="si"></span></th>
+            <th onclick="sortTable('user-table',5)">Last Login<span class="si"></span></th>
+            <th onclick="sortTable('user-table',6)">Perm Sets<span class="si"></span></th>
+            <th onclick="sortTable('user-table',7)">Risk<span class="si"></span></th>
+            <th>Action</th>
+          </tr></thead>
+          <tbody id="user-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pgn">
+        <span id="user-pgn-info"></span>
+        <div class="pgn-btns" id="user-pgn-btns"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <!-- LOB donut -->
+      <div class="panel">
+        <div class="ph"><h4>🍩 Users by LOB</h4></div>
+        <div class="dring">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#E0E4EC" stroke-width="20"/>
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#0066CC" stroke-width="20"
+              stroke-dasharray="116 276.5" stroke-dashoffset="69.1" transform="rotate(-90 60 60)"/>
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#7C3AED" stroke-width="20"
+              stroke-dasharray="67.9 276.5" stroke-dashoffset="-46.9" transform="rotate(-90 60 60)"/>
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#10B981" stroke-width="20"
+              stroke-dasharray="82.1 276.5" stroke-dashoffset="-114.8" transform="rotate(-90 60 60)"/>
+            <circle cx="60" cy="60" r="44" fill="none" stroke="#F59E0B" stroke-width="20"
+              stroke-dasharray="10.5 276.5" stroke-dashoffset="-196.9" transform="rotate(-90 60 60)"/>
+            <text x="60" y="56" text-anchor="middle" font-size="15" font-weight="800" fill="#1A1A2E">2,847</text>
+            <text x="60" y="69" text-anchor="middle" font-size="9" fill="#6B7280">Total</text>
+          </svg>
+          <div class="dl">
+            <div class="dli"><div class="dd" style="background:#0066CC"></div><span class="dn">SBB</span><span class="dv" style="margin-left:10px;">1,024</span></div>
+            <div class="dli"><div class="dd" style="background:#7C3AED"></div><span class="dn">SBCAT</span><span class="dv" style="margin-left:10px;">698</span></div>
+            <div class="dli"><div class="dd" style="background:#10B981"></div><span class="dn">Treasury</span><span class="dv" style="margin-left:10px;">821</span></div>
+            <div class="dli"><div class="dd" style="background:#F59E0B"></div><span class="dn">CIE LOD</span><span class="dv" style="margin-left:10px;">304</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- License bar -->
+      <div class="panel">
+        <div class="ph"><h4>📊 License Utilization</h4></div>
+        <div class="barchart" style="height:100px;">
+          <div class="bw"><div class="bval">2,641</div><div class="bspc"></div><div class="bcol" style="background:#0066CC;height:100%;"></div><div class="blbl">SF Used</div></div>
+          <div class="bw"><div class="bval">206</div><div class="bspc"></div><div class="bcol" style="background:#10B981;height:7.8%;"></div><div class="blbl">Available</div></div>
+          <div class="bw"><div class="bval">412</div><div class="bspc"></div><div class="bcol" style="background:#7C3AED;height:15.6%;"></div><div class="blbl">Platform</div></div>
+          <div class="bw"><div class="bval">134</div><div class="bspc"></div><div class="bcol" style="background:#ED1D24;height:5.1%;"></div><div class="blbl">Dormant</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: USER DIRECTORY ══════ -->
+<div class="page" id="page-users">
+  <div class="full panel">
+    <div class="ph">
+      <h4>👥 Full User Directory <span style="font-size:11px;font-weight:400;color:var(--muted)" id="dir-count"></span></h4>
+      <button class="pa" onclick="exportCSV()">Export CSV →</button>
+    </div>
+    <div class="lob-tabs" id="dir-lob-tabs">
+      <div class="lob-tab lt-all active-lob" onclick="dirLobClick(this,'')">All LOBs</div>
+      <div class="lob-tab lt-sbb" onclick="dirLobClick(this,'SBB')">SBB</div>
+      <div class="lob-tab lt-sbcat" onclick="dirLobClick(this,'SBCAT')">SBCAT</div>
+      <div class="lob-tab lt-tr" onclick="dirLobClick(this,'Treasury')">Treasury</div>
+      <div class="lob-tab lt-ci" onclick="dirLobClick(this,'CIE LOD')">CIE LOD</div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="dt" id="dir-table">
+        <thead><tr>
+          <th onclick="sortTable('dir-table',0)">User<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',1)">Username<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',2)">LOB<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',3)">Department<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',4)">Profile<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',5)">Role<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',6)">Status<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',7)">Last Login<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',8)">Perm Sets<span class="si"></span></th>
+          <th onclick="sortTable('dir-table',9)">Risk Score<span class="si"></span></th>
+        </tr></thead>
+        <tbody id="dir-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pgn">
+      <span id="dir-pgn-info"></span>
+      <div class="pgn-btns" id="dir-pgn-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: PROFILES & PERMISSIONS ══════ -->
+<div class="page" id="page-perms">
+  <div class="full panel">
+    <div class="ph"><h4>🔐 Profile × Permission Set Coverage Matrix</h4>
+      <button class="pa" onclick="switchTab(document.querySelector('[data-tab=template]'),'template')">Compare Profiles →</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="pm" id="perm-matrix">
+        <thead><tr>
+          <th style="text-align:left;">Profile</th>
+          <th>LOB</th><th>Users</th><th>API Enabled</th>
+          <th>Modify All</th><th>View All</th><th>Report Export</th>
+          <th>Manage Users</th><th>Perm Sets</th><th>Risk Score</th>
+        </tr></thead>
+        <tbody id="perm-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="full panel">
+    <div class="ph"><h4>🔄 Permission Set Changes — This Month</h4><button class="pa" onclick="exportCSV()">Export Audit →</button></div>
+    <div class="tbl-wrap">
+      <table class="dt" id="perm-change-table">
+        <thead><tr>
+          <th onclick="sortTable('perm-change-table',0)">User<span class="si"></span></th>
+          <th onclick="sortTable('perm-change-table',1)">LOB<span class="si"></span></th>
+          <th onclick="sortTable('perm-change-table',2)">Change<span class="si"></span></th>
+          <th onclick="sortTable('perm-change-table',3)">Permission Set<span class="si"></span></th>
+          <th onclick="sortTable('perm-change-table',4)">Date<span class="si"></span></th>
+          <th>Review Status</th>
+        </tr></thead>
+        <tbody id="perm-change-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: ROLE HIERARCHY ══════ -->
+<div class="page" id="page-roles">
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>🗺 TD Banking Role Hierarchy</h4>
+        <select id="role-lob-filter" onchange="renderRoles()" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--bg);">
+          <option value="">All LOBs</option>
+          <option>SBB</option><option>SBCAT</option><option>Treasury</option><option>CIE LOD</option>
+        </select>
+      </div>
+      <div id="role-tree"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>📊 User Count by Role Level</h4></div>
+      <div class="barchart" style="height:130px;">
+        <div class="bw"><div class="bval">1</div><div class="bspc"></div><div class="bcol" style="background:#1A1A2E;height:0.4%;"></div><div class="blbl">L1 President</div></div>
+        <div class="bw"><div class="bval">4</div><div class="bspc"></div><div class="bcol" style="background:#ED1D24;height:1.4%;"></div><div class="blbl">L2 VP</div></div>
+        <div class="bw"><div class="bval">14</div><div class="bspc"></div><div class="bcol" style="background:#F59E0B;height:4.9%;"></div><div class="blbl">L3 Director</div></div>
+        <div class="bw"><div class="bval">284</div><div class="bspc"></div><div class="bcol" style="background:#0066CC;height:99.7%;"></div><div class="blbl">L4 Manager</div></div>
+        <div class="bw"><div class="bval">285</div><div class="bspc"></div><div class="bcol" style="background:#10B981;height:100%;"></div><div class="blbl">L5 IC</div></div>
+      </div>
+      <div class="ph" style="margin-top:18px;"><h4>👥 Top Roles by Headcount</h4></div>
+      <table class="dt" style="font-size:12px;" id="role-headcount">
+        <thead><tr><th>Role</th><th>LOB</th><th>Users</th></tr></thead>
+        <tbody id="role-hc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: PROFILE TEMPLATES ══════ -->
+<div class="page" id="page-template">
+  <div class="panel full">
+    <div class="ph"><h4>📋 Profile Template Comparison</h4>
+      <button class="pa" onclick="runCompare()">Compare ↔</button>
+    </div>
+    <div class="compare-select">
+      <select id="cmp-a" onchange="runCompare()">
+        <option>SBB Standard</option><option>SBB Manager</option>
+        <option>SBCAT Analyst</option><option>SBCAT Manager</option>
+        <option>Treasury Analyst</option><option>Treasury Admin</option>
+        <option>CIE LOD Standard</option><option>System Administrator</option>
+      </select>
+      <select id="cmp-b" onchange="runCompare()">
+        <option>Treasury Admin</option><option>SBB Standard</option>
+        <option>SBB Manager</option><option>SBCAT Analyst</option>
+        <option>SBCAT Manager</option><option>Treasury Analyst</option>
+        <option>CIE LOD Standard</option><option>System Administrator</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table class="dt" id="cmp-table">
+        <thead><tr>
+          <th>Permission / Setting</th>
+          <th id="cmp-h-a">Profile A</th>
+          <th id="cmp-h-b">Profile B</th>
+          <th>Match</th>
+        </tr></thead>
+        <tbody id="cmp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: LOGIN ACTIVITY ══════ -->
+<div class="page" id="page-login">
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>🗓 Login Activity Heatmap — Last 13 Weeks</h4>
+        <select id="hm-lob" onchange="renderHeatmap()" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--bg);">
+          <option value="">All LOBs</option>
+          <option>SBB</option><option>SBCAT</option><option>Treasury</option><option>CIE LOD</option>
+        </select>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Daily login volume · darker = higher</div>
+      <div class="hm-grid" id="hm-grid"></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px;">
+        <span>Feb</span><span>Mar</span><span>Apr</span><span>May</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;margin-top:10px;font-size:11px;color:var(--muted);">
+        <span>Less</span>
+        <div class="hm hm0" style="height:11px;width:11px;flex-shrink:0;"></div>
+        <div class="hm hm1" style="height:11px;width:11px;flex-shrink:0;"></div>
+        <div class="hm hm2" style="height:11px;width:11px;flex-shrink:0;"></div>
+        <div class="hm hm3" style="height:11px;width:11px;flex-shrink:0;"></div>
+        <div class="hm hm4" style="height:11px;width:11px;flex-shrink:0;"></div>
+        <span>More</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>😴 Dormant Users — 90+ Days No Login</h4>
+        <button class="pa" onclick="exportCSV()">Export →</button>
+      </div>
+      <table class="dt" id="dormant-table">
+        <thead><tr>
+          <th onclick="sortTable('dormant-table',0)">User<span class="si"></span></th>
+          <th onclick="sortTable('dormant-table',1)">LOB<span class="si"></span></th>
+          <th onclick="sortTable('dormant-table',2)">Days Dormant<span class="si"></span></th>
+          <th onclick="sortTable('dormant-table',3)">Profile<span class="si"></span></th>
+          <th onclick="sortTable('dormant-table',4)">Perm Sets<span class="si"></span></th>
+        </tr></thead>
+        <tbody id="dormant-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: RISK & COMPLIANCE ══════ -->
+<div class="page" id="page-risk">
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>✅ Governance Compliance Checklist</h4>
+        <button class="pa" onclick="exportCSV()">Full Audit →</button>
+      </div>
+      <div id="compliance-list"></div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">
+        <span style="color:var(--muted);">Overall compliance score</span>
+        <span style="font-weight:800;font-size:16px;color:#D97706;" id="compliance-score"></span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>⚠ High-Risk Users</h4>
+        <button class="pa">Review All →</button>
+      </div>
+      <table class="dt" id="risk-table">
+        <thead><tr>
+          <th onclick="sortTable('risk-table',0)">User<span class="si"></span></th>
+          <th onclick="sortTable('risk-table',1)">LOB<span class="si"></span></th>
+          <th onclick="sortTable('risk-table',2)">Risk Score<span class="si"></span></th>
+          <th onclick="sortTable('risk-table',3)">Top Risk Factor<span class="si"></span></th>
+        </tr></thead>
+        <tbody id="risk-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ PAGE: TEAM MANAGEMENT ══════ -->
+<div class="page" id="page-team">
+  <div class="full panel">
+    <div class="ph"><h4>🏦 Account Team Memberships by LOB</h4>
+      <button class="pa" onclick="exportCSV()">Export →</button>
+    </div>
+    <div class="lob-tabs">
+      <div class="lob-tab lt-all active-lob" onclick="teamLobClick(this,'')">All</div>
+      <div class="lob-tab lt-sbb" onclick="teamLobClick(this,'SBB')">SBB</div>
+      <div class="lob-tab lt-sbcat" onclick="teamLobClick(this,'SBCAT')">SBCAT</div>
+      <div class="lob-tab lt-tr" onclick="teamLobClick(this,'Treasury')">Treasury</div>
+      <div class="lob-tab lt-ci" onclick="teamLobClick(this,'CIE LOD')">CIE LOD</div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="dt" id="team-table">
+        <thead><tr>
+          <th onclick="sortTable('team-table',0)">User<span class="si"></span></th>
+          <th onclick="sortTable('team-table',1)">LOB<span class="si"></span></th>
+          <th onclick="sortTable('team-table',2)">Team Role<span class="si"></span></th>
+          <th onclick="sortTable('team-table',3)">Accounts<span class="si"></span></th>
+          <th onclick="sortTable('team-table',4)">Access Level<span class="si"></span></th>
+        </tr></thead>
+        <tbody id="team-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const AVCOLORS = ['#0066CC','#7C3AED','#10B981','#F59E0B','#ED1D24','#EC4899'];
+const LOB_MAP  = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'};
+
+const PROFILES = [
+  {name:'SBB Standard',   lob:'SBB',     users:624, api:false,modAll:false,viewAll:false,reportExp:true, manUsers:false,permSets:2, risk:12},
+  {name:'SBB Manager',    lob:'SBB',     users:400, api:true, modAll:false,viewAll:true, reportExp:true, manUsers:false,permSets:4, risk:48},
+  {name:'SBCAT Analyst',  lob:'SBCAT',   users:440, api:false,modAll:false,viewAll:false,reportExp:true, manUsers:false,permSets:1, risk:18},
+  {name:'SBCAT Manager',  lob:'SBCAT',   users:258, api:true, modAll:false,viewAll:true, reportExp:true, manUsers:true, permSets:6, risk:62},
+  {name:'Treasury Analyst',lob:'Treasury',users:512,api:true, modAll:false,viewAll:true, reportExp:true, manUsers:false,permSets:3, risk:54},
+  {name:'Treasury Admin', lob:'Treasury',users:309, api:true, modAll:true, viewAll:true, reportExp:true, manUsers:true, permSets:7, risk:88},
+  {name:'CIE LOD Standard',lob:'CIE LOD',users:304, api:false,modAll:false,viewAll:false,reportExp:false,manUsers:false,permSets:1, risk:8},
+  {name:'System Administrator',lob:'Global',users:29,api:true,modAll:true,viewAll:true,reportExp:true,manUsers:true,permSets:12,risk:100}
+];
+
+const USERS = [
+  {name:'James Carver',  email:'j.carver@td.com',   lob:'SBB',     profile:'SBB Manager',    role:'VP, Small Business',    status:'Active',  lastLogin:'May 14',permSets:4,risk:'High',  riskScore:78},
+  {name:'Aisha Mohammed',email:'a.mohammed@td.com',  lob:'SBCAT',   profile:'SBCAT Analyst',   role:'Sr. Analyst, SBCAT',    status:'Active',  lastLogin:'May 13',permSets:2,risk:'Low',   riskScore:18},
+  {name:'Robert Kim',    email:'r.kim@td.com',       lob:'Treasury',profile:'Treasury Admin',  role:'Director, Treasury Ops',status:'Active',  lastLogin:'May 14',permSets:7,risk:'High',  riskScore:88},
+  {name:'Laura Patel',   email:'l.patel@td.com',     lob:'CIE LOD', profile:'CIE LOD Standard',role:'Analyst, CIE',          status:'Dormant', lastLogin:'Feb 3', permSets:1,risk:'Medium',riskScore:52},
+  {name:'Thomas Nguyen', email:'t.nguyen@td.com',    lob:'SBB',     profile:'SBB Standard',    role:'Relationship Mgr',      status:'Active',  lastLogin:'May 12',permSets:3,risk:'Low',   riskScore:22},
+  {name:'Sofia Chen',    email:'s.chen@td.com',      lob:'Treasury',profile:'Treasury Analyst', role:'Analyst II, Treasury',  status:'Active',  lastLogin:'May 14',permSets:5,risk:'High',  riskScore:81},
+  {name:'Derek Walsh',   email:'d.walsh@td.com',     lob:'SBCAT',   profile:'SBCAT Manager',   role:'Manager, SBCAT',        status:'Inactive',lastLogin:'Mar 18',permSets:0,risk:'Low',   riskScore:10},
+  {name:'Priya Nair',    email:'p.nair@td.com',      lob:'SBCAT',   profile:'SBCAT Analyst',   role:'Analyst I, SBCAT',      status:'Dormant', lastLogin:'Jan 28',permSets:2,risk:'Medium',riskScore:45},
+  {name:'Marcus Reed',   email:'m.reed@td.com',      lob:'SBB',     profile:'SBB Standard',    role:'Relationship Mgr',      status:'Dormant', lastLogin:'Dec 12',permSets:3,risk:'Medium',riskScore:61},
+  {name:'Chen Wei',      email:'c.wei@td.com',       lob:'Treasury',profile:'Treasury Analyst', role:'Analyst, Treasury',     status:'Dormant', lastLogin:'Feb 11',permSets:4,risk:'High',  riskScore:75},
+  {name:'Susan Blake',   email:'s.blake@td.com',     lob:'SBB',     profile:'SBB Manager',     role:'Dir, SBB East',         status:'Active',  lastLogin:'May 13',permSets:4,risk:'Medium',riskScore:55},
+  {name:'Jorge Mendez',  email:'j.mendez@td.com',    lob:'SBCAT',   profile:'SBCAT Manager',   role:'Manager, SBCAT B',      status:'Dormant', lastLogin:'Nov 22',permSets:2,risk:'Low',   riskScore:30},
+  {name:'Tanya Williams',email:'t.williams@td.com',  lob:'CIE LOD', profile:'CIE LOD Standard',role:'Analyst, CIE',          status:'Dormant', lastLogin:'Feb 3', permSets:0,risk:'Low',   riskScore:8},
+  {name:'Kevin Park',    email:'k.park@td.com',      lob:'Treasury',profile:'Treasury Admin',  role:'Director, Treasury Ana',status:'Active',  lastLogin:'May 14',permSets:8,risk:'High',  riskScore:92},
+  {name:'Angela Torres', email:'a.torres@td.com',    lob:'SBB',     profile:'SBB Standard',    role:'Relationship Mgr',      status:'Active',  lastLogin:'May 11',permSets:1,risk:'Low',   riskScore:12},
+  {name:'Brian Scott',   email:'b.scott@td.com',     lob:'SBCAT',   profile:'SBCAT Analyst',   role:'Analyst II, SBCAT',     status:'Active',  lastLogin:'May 12',permSets:2,risk:'Low',   riskScore:20}
+];
+
+const PERM_CHANGES = [
+  {user:'Robert Kim',    lob:'Treasury',change:'Added',  ps:'Treasury_FullAccess_PS',  date:'May 12'},
+  {user:'Sofia Chen',    lob:'Treasury',change:'Added',  ps:'Manage_Reports_PS',        date:'May 11'},
+  {user:'Derek Walsh',   lob:'SBCAT',   change:'Removed',ps:'SBCAT_Manager_PS',         date:'May 9'},
+  {user:'James Carver',  lob:'SBB',     change:'Added',  ps:'API_Integration_PS',       date:'May 8'},
+  {user:'Thomas Nguyen', lob:'SBB',     change:'Removed',ps:'SBB_DataExport_PS',        date:'May 6'},
+  {user:'Aisha Mohammed',lob:'SBCAT',   change:'Added',  ps:'SBCAT_ViewAll_PS',         date:'May 5'},
+  {user:'Priya Nair',    lob:'SBCAT',   change:'Removed',ps:'SBCAT_APIEnable_PS',       date:'May 3'}
+];
+
+const COMPLIANCE = [
+  {pass:true, text:'All SBB users assigned SBB profile',            lob:'SBB · 1,024 users'},
+  {pass:true, text:'SBCAT users have no Modify All on Account',     lob:'SBCAT · 698 users'},
+  {pass:false,text:'Treasury Admins: Modify All on Opportunity — 309 users',lob:'Treasury · Action'},
+  {pass:false,text:'29 System Admins exceed LOB isolation policy',  lob:'Global · Action'},
+  {pass:'warn',text:'134 dormant users still hold active permission sets',lob:'All LOBs · Review'},
+  {pass:true, text:'CIE LOD users: no API access granted',          lob:'CIE LOD · 304 users'},
+  {pass:'warn',text:'7 users have permission sets from a different LOB',lob:'Cross-LOB · Review'},
+  {pass:true, text:'All roles have at least one assigned user',     lob:'Global · 62 roles'}
+];
+
+const ROLES = [
+  {name:'TD Banking — President', lob:'',          level:1,count:2847},
+  {name:'VP, Small Business Banking',lob:'SBB',   level:2,count:1024},
+  {name:'Director, SBB East',    lob:'SBB',        level:3,count:512},
+  {name:'Director, SBB West',    lob:'SBB',        level:3,count:512},
+  {name:'VP, SBCAT Operations',  lob:'SBCAT',      level:2,count:698},
+  {name:'Manager, SBCAT Team A', lob:'SBCAT',      level:3,count:349},
+  {name:'Manager, SBCAT Team B', lob:'SBCAT',      level:3,count:349},
+  {name:'VP, Treasury Management',lob:'Treasury',  level:2,count:821},
+  {name:'Director, Treasury Ops',lob:'Treasury',   level:3,count:411},
+  {name:'Director, Treasury Ana',lob:'Treasury',   level:3,count:410},
+  {name:'VP, CIE Line of Defense',lob:'CIE LOD',  level:2,count:304},
+  {name:'Manager, CIE Oversight',lob:'CIE LOD',   level:3,count:304}
+];
+
+const PROFILE_PERMS = {
+  'SBB Standard':    {api:'No',modAll:'No',viewAll:'No', reportExp:'Yes',manUsers:'No', fls:'Read',pageLayouts:'SBB Standard',tabs:'SBB Sales'},
+  'SBB Manager':     {api:'Yes',modAll:'No',viewAll:'Yes',reportExp:'Yes',manUsers:'No', fls:'Read/Edit',pageLayouts:'SBB Manager',tabs:'SBB Full'},
+  'SBCAT Analyst':   {api:'No',modAll:'No',viewAll:'No', reportExp:'Yes',manUsers:'No', fls:'Read',pageLayouts:'SBCAT Standard',tabs:'SBCAT Sales'},
+  'SBCAT Manager':   {api:'Yes',modAll:'No',viewAll:'Yes',reportExp:'Yes',manUsers:'Yes',fls:'Read/Edit',pageLayouts:'SBCAT Manager',tabs:'SBCAT Full'},
+  'Treasury Analyst':{api:'Yes',modAll:'No',viewAll:'Yes',reportExp:'Yes',manUsers:'No', fls:'Read/Edit',pageLayouts:'Treasury Analyst',tabs:'Treasury'},
+  'Treasury Admin':  {api:'Yes',modAll:'Yes',viewAll:'Yes',reportExp:'Yes',manUsers:'Yes',fls:'All',pageLayouts:'Treasury Admin',tabs:'All'},
+  'CIE LOD Standard':{api:'No',modAll:'No',viewAll:'No', reportExp:'No', manUsers:'No', fls:'Read',pageLayouts:'CIE Standard',tabs:'CIE'},
+  'System Administrator':{api:'Yes',modAll:'Yes',viewAll:'Yes',reportExp:'Yes',manUsers:'Yes',fls:'All',pageLayouts:'All',tabs:'All'}
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let filteredUsers = [...USERS];
+let currentPage   = 1;
+let dirPage       = 1;
+const PAGE_SIZE   = 8;
+let activeLob     = '';
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(el, tabId) {
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tabId).classList.add('active');
+  if (tabId === 'perms')    { renderPermMatrix(); renderPermChanges(); }
+  if (tabId === 'roles')    { renderRoles(); renderRoleHeadcount(); }
+  if (tabId === 'template') { runCompare(); }
+  if (tabId === 'login')    { renderHeatmap(); renderDormant(); }
+  if (tabId === 'risk')     { renderCompliance(); renderHighRisk(); }
+  if (tabId === 'team')     { renderTeam(''); }
+  if (tabId === 'users')    { renderDirTable(''); }
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const lob    = document.getElementById('f-lob').value;
+  const status = document.getElementById('f-status').value;
+  const profile= document.getElementById('f-profile').value;
+  const search = document.getElementById('f-search').value.toLowerCase();
+
+  filteredUsers = USERS.filter(u => {
+    if (lob    && u.lob !== lob)          return false;
+    if (status && u.status !== status)    return false;
+    if (profile&& u.profile !== profile)  return false;
+    if (search && !u.name.toLowerCase().includes(search) && !u.email.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  currentPage = 1;
+  renderUserTable();
+  updateKPIs();
+}
+
+function resetFilters() {
+  ['f-lob','f-status','f-profile'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-search').value = '';
+  filteredUsers = [...USERS];
+  currentPage = 1;
+  renderUserTable();
+  updateKPIs();
+}
+
+function filterByLob(lob) {
+  document.getElementById('f-lob').value = lob;
+  applyFilters();
+}
+function filterByStatus(s) {
+  document.getElementById('f-status').value = s;
+  applyFilters();
+}
+function filterByRisk(r) {
+  filteredUsers = USERS.filter(u => u.risk === r);
+  currentPage = 1;
+  renderUserTable();
+}
+
+function lobTabClick(el, lob) {
+  document.querySelectorAll('#lob-tab-row .lob-tab').forEach(t => t.classList.remove('active-lob'));
+  el.classList.add('active-lob');
+  filterByLob(lob);
+}
+function dirLobClick(el, lob) {
+  document.querySelectorAll('#dir-lob-tabs .lob-tab').forEach(t => t.classList.remove('active-lob'));
+  el.classList.add('active-lob');
+  renderDirTable(lob);
+}
+function teamLobClick(el, lob) {
+  document.querySelectorAll('.page.active .lob-tabs .lob-tab').forEach(t => t.classList.remove('active-lob'));
+  el.classList.add('active-lob');
+  renderTeam(lob);
+}
+
+// ── KPIS ──────────────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const active  = filteredUsers.filter(u => u.status === 'Active').length;
+  const dormant = filteredUsers.filter(u => u.status === 'Dormant').length;
+  const risk    = filteredUsers.filter(u => u.risk === 'High').length;
+  const total   = filteredUsers.length;
+  const pct     = total ? ((active/total)*100).toFixed(1) : '0.0';
+
+  document.getElementById('k-total').textContent      = total.toLocaleString();
+  document.getElementById('k-active').textContent     = active.toLocaleString();
+  document.getElementById('k-active-pct').textContent = pct + '%';
+  document.getElementById('k-dormant').textContent    = dormant.toLocaleString();
+  document.getElementById('k-risk').textContent       = risk;
+  document.getElementById('risk-badge').textContent   = risk;
+}
+
+// ── USER TABLE ────────────────────────────────────────────────────────────────
+function renderUserTable() {
+  const tbody = document.getElementById('user-tbody');
+  const total = filteredUsers.length;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = filteredUsers.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('user-count').textContent = `(${total} users)`;
+
+  tbody.innerHTML = slice.length
+    ? slice.map(u => userRow(u)).join('')
+    : '<tr><td colspan="9" class="nodata">No users match the current filters.</td></tr>';
+
+  renderPagination('user-pgn-info','user-pgn-btns', total, currentPage,
+    p => { currentPage = p; renderUserTable(); });
+}
+
+function userRow(u) {
+  const init   = u.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+  const avBg   = AVCOLORS[Math.abs(u.name.charCodeAt(0) - 65) % AVCOLORS.length];
+  const lobCls = LOB_MAP[u.lob] || '';
+  const stCls  = {Active:'c-active',Inactive:'c-inactive',Dormant:'c-dormant'}[u.status];
+  const rCls   = {High:'risk-h',Medium:'risk-m',Low:'risk-l'}[u.risk];
+  return `<tr>
+    <td><div class="urow"><div class="av" style="background:${avBg};">${init}</div><div><div class="un">${u.name}</div><div class="ue">${u.email}</div></div></div></td>
+    <td><span class="chip ${lobCls}">${u.lob}</span></td>
+    <td>${u.profile}</td>
+    <td style="font-size:11px;color:var(--muted);">${u.role}</td>
+    <td><span class="chip ${stCls}">${u.status}</span></td>
+    <td style="font-size:11px;">${u.lastLogin}</td>
+    <td style="text-align:center;font-weight:700;">${u.permSets}</td>
+    <td><span class="risk ${rCls}">${u.risk === 'High' ? '🔴' : u.risk === 'Medium' ? '⚠' : '✓'} ${u.risk}</span></td>
+    <td><button class="pa" onclick="viewUserDetail('${u.name}')">Detail →</button></td>
+  </tr>`;
+}
+
+function viewUserDetail(name) {
+  const u = USERS.find(x => x.name === name);
+  if (!u) return;
+  alert(`User: ${u.name}\nLOB: ${u.lob}\nProfile: ${u.profile}\nRole: ${u.role}\nStatus: ${u.status}\nLast Login: ${u.lastLogin}\nPerm Sets: ${u.permSets}\nRisk: ${u.risk} (Score: ${u.riskScore})`);
+}
+
+// ── DIR TABLE ─────────────────────────────────────────────────────────────────
+function renderDirTable(lob) {
+  const list = lob ? USERS.filter(u => u.lob === lob) : USERS;
+  document.getElementById('dir-count').textContent = `(${list.length} users)`;
+  const tbody = document.getElementById('dir-tbody');
+  const start = (dirPage - 1) * PAGE_SIZE;
+  const slice = list.slice(start, start + PAGE_SIZE);
+  tbody.innerHTML = slice.map(u => {
+    const init = u.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+    const avBg = AVCOLORS[Math.abs(u.name.charCodeAt(0) - 65) % AVCOLORS.length];
+    const lobCls = LOB_MAP[u.lob] || '';
+    const stCls  = {Active:'c-active',Inactive:'c-inactive',Dormant:'c-dormant'}[u.status];
+    const rCls   = {High:'risk-h',Medium:'risk-m',Low:'risk-l'}[u.risk];
+    const scCol  = u.riskScore >= 70 ? '#DC2626' : u.riskScore >= 40 ? '#D97706' : '#10B981';
+    return `<tr>
+      <td><div class="urow"><div class="av" style="background:${avBg};">${init}</div><div><div class="un">${u.name}</div><div class="ue">${u.email}</div></div></div></td>
+      <td class="mono">${u.email}</td>
+      <td><span class="chip ${lobCls}">${u.lob}</span></td>
+      <td style="font-size:11px;color:var(--muted);">TD ${u.lob}</td>
+      <td>${u.profile}</td>
+      <td style="font-size:11px;">${u.role}</td>
+      <td><span class="chip ${stCls}">${u.status}</span></td>
+      <td style="font-size:11px;">${u.lastLogin}</td>
+      <td style="text-align:center;font-weight:700;">${u.permSets}</td>
+      <td>
+        <div class="srow">
+          <div class="sbar"><div class="sfill" style="width:${u.riskScore}%;background:${scCol};"></div></div>
+          <span class="snum" style="color:${scCol};">${u.riskScore}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  renderPagination('dir-pgn-info','dir-pgn-btns', list.length, dirPage,
+    p => { dirPage = p; renderDirTable(lob); });
+}
+
+// ── PERM MATRIX ───────────────────────────────────────────────────────────────
+function renderPermMatrix() {
+  const tbody = document.getElementById('perm-tbody');
+  tbody.innerHTML = PROFILES.map(p => {
+    const lobCls = LOB_MAP[p.lob] || '';
+    const rCls   = p.risk >= 70 ? 'cell-risk-h' : p.risk >= 40 ? 'cell-risk-m' : 'cell-risk-l';
+    const y = v => `<td class="${v ? 'cell-y' : 'cell-n'}">${v ? '✓' : '✗'}</td>`;
+    const yw = v => `<td class="${v ? 'cell-warn' : 'cell-n'}">${v ? '⚠ Yes' : '✗'}</td>`;
+    return `<tr>
+      <td class="pname">${p.name}</td>
+      <td>${p.lob !== 'Global' ? `<span class="chip ${lobCls}">${p.lob}</span>` : '<span style="font-size:11px;color:var(--muted);">Global</span>'}</td>
+      <td class="cell-cnt">${p.users}</td>
+      ${y(p.api)}${yw(p.modAll)}${y(p.viewAll)}${y(p.reportExp)}${yw(p.manUsers)}
+      <td class="cell-cnt">${p.permSets}</td>
+      <td class="${rCls}">${p.risk}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPermChanges() {
+  const tbody = document.getElementById('perm-change-tbody');
+  tbody.innerHTML = PERM_CHANGES.map(c => {
+    const lobCls = LOB_MAP[c.lob] || '';
+    const addCls = c.change === 'Added' ? 'color:#16A34A;font-weight:700;' : 'color:#DC2626;font-weight:700;';
+    const status = c.change === 'Added' ? '<span class="tag t-r">Unreviewed</span>' : '<span class="tag t-n">Processed</span>';
+    return `<tr>
+      <td class="fw">${c.user}</td>
+      <td><span class="chip ${lobCls}">${c.lob}</span></td>
+      <td style="${addCls}">${c.change === 'Added' ? '+ Added' : '− Removed'}</td>
+      <td class="mono">${c.ps}</td>
+      <td style="font-size:11px;color:var(--muted);">${c.date}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── ROLES ─────────────────────────────────────────────────────────────────────
+function renderRoles() {
+  const lobFilter = document.getElementById('role-lob-filter').value;
+  const tree = document.getElementById('role-tree');
+  const visible = ROLES.filter(r => !lobFilter || r.lob === lobFilter || r.level === 1);
+  const icons = ['👑','🏢','📁'];
+  const lobClass = {SBB:'lt-sbb',SBCAT:'lt-sbcat',Treasury:'lt-tr','CIE LOD':'lt-ci'};
+  tree.innerHTML = visible.map(r => {
+    const lvlCls = ['rl1','rl2','rl3'][r.level - 1] || 'rl3';
+    const lobTag = r.lob ? `<span class="rnl ${lobClass[r.lob] || ''}" style="margin-left:6px;">${r.lob}</span>` : '';
+    return `<div class="role-node ${lvlCls}">
+      <span class="rni">${icons[r.level-1]||'📄'}</span>
+      <span class="rnm">${r.name}</span>${lobTag}
+      <span class="rnc">${r.count.toLocaleString()}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderRoleHeadcount() {
+  const tbody = document.getElementById('role-hc-tbody');
+  const sorted = [...ROLES].sort((a,b) => b.count - a.count).slice(0,6);
+  const lobClass = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'};
+  tbody.innerHTML = sorted.map(r => `<tr>
+    <td class="fw">${r.name}</td>
+    <td>${r.lob ? `<span class="chip ${lobClass[r.lob]||''}">${r.lob}</span>` : '—'}</td>
+    <td style="font-weight:700;">${r.count.toLocaleString()}</td>
+  </tr>`).join('');
+}
+
+// ── PROFILE COMPARE ───────────────────────────────────────────────────────────
+function runCompare() {
+  const a = document.getElementById('cmp-a').value;
+  const b = document.getElementById('cmp-b').value;
+  document.getElementById('cmp-h-a').textContent = a;
+  document.getElementById('cmp-h-b').textContent = b;
+  const pA = PROFILE_PERMS[a] || {};
+  const pB = PROFILE_PERMS[b] || {};
+  const keys = ['api','modAll','viewAll','reportExp','manUsers','fls','pageLayouts','tabs'];
+  const labels = {'api':'API Enabled','modAll':'Modify All Records','viewAll':'View All Records',
+    'reportExp':'Report Export','manUsers':'Manage Users','fls':'Field Level Security',
+    'pageLayouts':'Page Layouts','tabs':'App/Tab Access'};
+  const tbody = document.getElementById('cmp-tbody');
+  tbody.innerHTML = keys.map(k => {
+    const va = String(pA[k]||'—');
+    const vb = String(pB[k]||'—');
+    const match = va === vb;
+    return `<tr class="${match ? 'diff-row-match' : 'diff-row-diff'}">
+      <td class="fw">${labels[k]}</td>
+      <td>${va}</td>
+      <td>${vb}</td>
+      <td>${match ? '<span class="tag t-g">✓ Match</span>' : '<span class="tag t-r">✗ Differs</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── HEATMAP ───────────────────────────────────────────────────────────────────
+function renderHeatmap() {
+  const grid = document.getElementById('hm-grid');
+  const cells = [];
+  const pat = [3,4,3,4,3,0,0,4,4,3,2,4,3,2,3,4,3,4,0,0,3,2,3,4,3,4,4,3,2,4,3,3,4,2,4,3,4,2,1,2,3,2,3,4,3,2,3,4,3,4,3,4,2,4,4,3,2,3,4,3,4,3,0,1,0,1,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,0,1,0,1,0,0,0,1];
+  for (let i = 0; i < 91; i++) {
+    cells.push(`<div class="hm hm${pat[i % pat.length]}" title="Day ${i+1}: ${[0,12,58,142,210][pat[i % pat.length]]} logins"></div>`);
+  }
+  grid.innerHTML = cells.join('');
+}
+
+// ── DORMANT ───────────────────────────────────────────────────────────────────
+function renderDormant() {
+  const dormant = USERS.filter(u => u.status === 'Dormant');
+  const tbody = document.getElementById('dormant-tbody');
+  tbody.innerHTML = dormant.map(u => {
+    const lobCls = LOB_MAP[u.lob] || '';
+    const days = Math.floor(Math.random()*120)+90;
+    const dCls = days >= 120 ? 't-r' : 't-a';
+    return `<tr>
+      <td class="fw">${u.name}</td>
+      <td><span class="chip ${lobCls}">${u.lob}</span></td>
+      <td><span class="tag ${dCls}">${days}d</span></td>
+      <td style="font-size:11px;">${u.profile}</td>
+      <td style="text-align:center;font-weight:700;">${u.permSets}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── COMPLIANCE ────────────────────────────────────────────────────────────────
+function renderCompliance() {
+  const el = document.getElementById('compliance-list');
+  const pass = COMPLIANCE.filter(c => c.pass === true).length;
+  el.innerHTML = COMPLIANCE.map(c => {
+    const cls = c.pass === true ? 'chk-pass' : c.pass === false ? 'chk-fail' : 'chk-warn';
+    const ico = c.pass === true ? '✅' : c.pass === false ? '❌' : '⚠️';
+    const txtCls = c.pass === true ? 'color:#16A34A;' : c.pass === false ? 'color:#DC2626;' : 'color:#D97706;';
+    return `<div class="chk-item ${cls}">
+      <span class="chk-ico">${ico}</span>
+      <span class="chk-txt" style="${txtCls}">${c.text}</span>
+      <span class="chk-lob">${c.lob}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('compliance-score').textContent = `${pass} / ${COMPLIANCE.length} passing`;
+}
+
+function renderHighRisk() {
+  const high = USERS.filter(u => u.risk === 'High').sort((a,b) => b.riskScore - a.riskScore);
+  const tbody = document.getElementById('risk-tbody');
+  const lobClass = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'};
+  tbody.innerHTML = high.map(u => {
+    const scCol = u.riskScore >= 80 ? '#DC2626' : '#D97706';
+    const factors = u.permSets >= 7 ? 'Excessive Perm Sets' : u.profile.includes('Admin') ? 'Admin Profile + Modify All' : 'High Perm Set Count';
+    return `<tr>
+      <td class="fw">${u.name}</td>
+      <td><span class="chip ${lobClass[u.lob]||''}">${u.lob}</span></td>
+      <td>
+        <div class="srow">
+          <div class="sbar"><div class="sfill" style="width:${u.riskScore}%;background:${scCol};"></div></div>
+          <span class="snum" style="color:${scCol};">${u.riskScore}</span>
+        </div>
+      </td>
+      <td style="font-size:11px;color:#DC2626;">${factors}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── TEAM ──────────────────────────────────────────────────────────────────────
+function renderTeam(lob) {
+  const list = lob ? USERS.filter(u => u.lob === lob) : USERS;
+  const tbody = document.getElementById('team-tbody');
+  const roles = ['Account Executive','Relationship Manager','Sales Overlay','Customer Success','Technical Advisor','VP Sponsor'];
+  const access = ['Read/Write','Read Only','Read/Write','Read Only','Read/Write','Read/Write'];
+  const acctCounts = [8,12,5,15,7,3];
+  tbody.innerHTML = list.slice(0,10).map((u,i) => {
+    const lobCls = LOB_MAP[u.lob] || '';
+    return `<tr>
+      <td class="fw">${u.name}</td>
+      <td><span class="chip ${lobCls}">${u.lob}</span></td>
+      <td>${roles[i % roles.length]}</td>
+      <td style="text-align:center;font-weight:700;">${acctCounts[i % acctCounts.length]}</td>
+      <td><span class="tag ${access[i % access.length] === 'Read/Write' ? 't-g' : 't-n'}">${access[i % access.length]}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── PAGINATION ────────────────────────────────────────────────────────────────
+function renderPagination(infoId, btnsId, total, current, callback) {
+  const pages = Math.ceil(total / PAGE_SIZE) || 1;
+  document.getElementById(infoId).textContent =
+    `Showing ${Math.min((current-1)*PAGE_SIZE+1, total)}–${Math.min(current*PAGE_SIZE, total)} of ${total}`;
+  const btns = document.getElementById(btnsId);
+  let html = `<div class="pb" onclick="(${callback.toString()})(${current-1})" ${current===1?'style="opacity:.35;pointer-events:none;"':''}>‹</div>`;
+  pagRange(current, pages).forEach(p => {
+    if (p === '…') html += `<div class="pb" style="pointer-events:none;">…</div>`;
+    else html += `<div class="pb ${p===current?'act':''}" onclick="(${callback.toString()})(${p})">${p}</div>`;
+  });
+  html += `<div class="pb" onclick="(${callback.toString()})(${current+1})" ${current===pages?'style="opacity:.35;pointer-events:none;"':''}>›</div>`;
+  btns.innerHTML = html;
+}
+
+function pagRange(cur, pages) {
+  if (pages <= 7) return Array.from({length:pages},(_,i)=>i+1);
+  const r = [1];
+  if (cur > 3) r.push('…');
+  for (let i=Math.max(2,cur-1); i<=Math.min(pages-1,cur+1); i++) r.push(i);
+  if (cur < pages-2) r.push('…');
+  r.push(pages);
+  return r;
+}
+
+// ── SORT ─────────────────────────────────────────────────────────────────────
+function sortTable(id, col) {
+  const tbl = document.getElementById(id);
+  if (!tbl) return;
+  const tbody = tbl.querySelector('tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  const th    = tbl.querySelectorAll('th')[col];
+  const asc   = !th.classList.contains('asc');
+  tbl.querySelectorAll('th').forEach(t => t.classList.remove('asc','desc'));
+  th.classList.add(asc ? 'asc' : 'desc');
+  rows.sort((a,b) => {
+    const av = a.cells[col]?.textContent.trim() || '';
+    const bv = b.cells[col]?.textContent.trim() || '';
+    const an = parseFloat(av.replace(/[^0-9.\-]/g,''));
+    const bn = parseFloat(bv.replace(/[^0-9.\-]/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return asc ? an-bn : bn-an;
+    return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const headers = ['Name','Email','LOB','Profile','Role','Status','LastLogin','PermSets','Risk','RiskScore'];
+  const rows = filteredUsers.map(u =>
+    [`"${u.name}"`,u.email,u.lob,`"${u.profile}"`,`"${u.role}"`,u.status,u.lastLogin,u.permSets,u.risk,u.riskScore].join(',')
+  );
+  const csv = [headers.join(','),...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'TD_Banking_Users.csv';
+  link.click();
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderUserTable();
+  updateKPIs();
+  renderHeatmap();
+  renderDormant();
+  renderCompliance();
+  renderHighRisk();
+  renderTeam('');
+});
+</script>
+</body>
+</html>

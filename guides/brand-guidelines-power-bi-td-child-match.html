@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brand Guidelines — Power BI (TD Banking Child Records POC)</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;--green:#10B981;--amber:#F59E0B;--bad:#DC2626;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;}
+header{background:var(--dark);color:#fff;padding:14px 22px;border-bottom:3px solid var(--red);position:sticky;top:0;z-index:20;}
+header .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+header .mark{width:30px;height:30px;background:var(--red);border-radius:6px;display:grid;place-items:center;font-weight:900;font-size:14px;}
+header h1{font-size:14px;font-weight:700;}
+header a{color:#93C5FD;font-size:12px;margin-left:auto;}
+nav{background:var(--white);border-bottom:1px solid var(--border);padding:10px 22px;display:flex;gap:14px;flex-wrap:wrap;position:sticky;top:51px;z-index:19;}
+nav a{font-size:12px;font-weight:600;color:var(--blue);text-decoration:none;}
+nav a:hover{text-decoration:underline;}
+main{max-width:920px;margin:0 auto;padding:28px 22px 48px;}
+h2{font-size:17px;color:var(--dark);margin:32px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--border);}
+h2:first-of-type{margin-top:0;}
+h3{font-size:14px;margin:18px 0 8px;color:var(--dark);}
+p{margin:8px 0;color:var(--muted);}
+ul{margin:8px 0 8px 20px;color:var(--muted);}
+li{margin:4px 0;}
+code,.mono{font-family:'Cascadia Code','Consolas',monospace;font-size:12px;background:#EEF2FF;padding:1px 5px;border-radius:4px;}
+table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);margin:12px 0;font-size:13px;}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);}
+th{background:var(--dark);color:#fff;font-weight:600;font-size:12px;}
+tr:last-child td{border-bottom:none;}
+.callout{border-left:4px solid var(--red);background:var(--white);padding:12px 16px;margin:14px 0;border:1px solid var(--border);font-size:13px;}
+.sw{display:inline-block;width:22px;height:22px;border-radius:4px;vertical-align:middle;border:1px solid var(--border);margin-right:6px;}
+.asset-dock{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:12px;}
+.asset-dock>h3{font-size:15px;color:var(--dark);margin-bottom:6px;}
+.asset-dock>.sub{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.asset-tabrow{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--border);margin-top:12px;}
+.asset-tab{padding:10px 14px;font-size:12px;font-weight:600;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;border-radius:6px 6px 0 0;}
+.asset-tab:hover{color:var(--text);background:var(--bg);}
+.asset-tab.active{color:var(--red);border-bottom-color:var(--red);background:var(--bg);}
+.asset-pane{display:none;padding:14px 2px 4px;}
+.asset-pane.active{display:block;}
+.asset-pane .fname{font-size:11px;font-weight:700;color:var(--dark);font-family:'Cascadia Code','Consolas',monospace;margin-bottom:8px;}
+.asset-pane p{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;}
+.asset-dock button.dl{background:var(--dark);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;}
+.asset-dock button.dl:hover{opacity:.92;}
+.asset-dock button.dl.sec{background:var(--white);color:var(--dark);border:1px solid var(--border);}
+.asset-dock button.dl.sec:hover{border-color:var(--blue);color:var(--blue);}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="mark">M</div>
+    <h1>Power BI brand and UI guidelines — Salesforce Child Records Match (POC)</h1>
+    <a href="../job-aide-hub.html">Hub</a>
+  </div>
+</header>
+<nav>
+  <a href="#purpose">Purpose</a>
+  <a href="#tokens">Color and type</a>
+  <a href="#layout">Page layout</a>
+  <a href="#visuals">Charts and KPIs</a>
+  <a href="#semantics">Data semantics</a>
+  <a href="#access">Accessibility</a>
+  <a href="#governance">Governance</a>
+  <a href="#assets">Downloads</a>
+</nav>
+<main>
+  <section id="purpose">
+    <h2>Purpose and scope</h2>
+    <p>This guide defines how Task 2 (and shared Task 1 pages) should <strong>look and behave</strong> in Power BI so the suite reads as one TD-aligned product: restrained color, clear hierarchy, and consistent semantics for match rates, orphans, and API health.</p>
+    <div class="callout">Apply the same theme JSON to every semantic model in the workspace. Keep executive pages free of monospace SOQL; relegate technical strings to tooltips or a dedicated “Technical” page.</div>
+  </section>
+
+  <section id="tokens">
+    <h2>Color tokens</h2>
+    <p>Use these as the Power BI theme <code>dataColors</code> order and as semantic accents (good, warn, danger, neutral). Download <code>brand-tokens.json</code> from the hub for a machine-readable copy.</p>
+    <table>
+      <thead><tr><th>Token</th><th>Hex</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>Brand red</td><td><span class="sw" style="background:#ED1D24"></span><code>#ED1D24</code></td><td>Primary accent: selected slicers, key CTA buttons in bookmarks, top rule line</td></tr>
+        <tr><td>Brand dark</td><td><span class="sw" style="background:#1A1A2E"></span><code>#1A1A2E</code></td><td>Header bands, table column headers, icon foreground on light tiles</td></tr>
+        <tr><td>Brand blue</td><td><span class="sw" style="background:#0066CC"></span><code>#0066CC</code></td><td>Links, secondary emphasis, focus rings</td></tr>
+        <tr><td>Page background</td><td><span class="sw" style="background:#F4F5F7"></span><code>#F4F5F7</code></td><td>Canvas background for all pages</td></tr>
+        <tr><td>Surface</td><td><span class="sw" style="background:#FFFFFF"></span><code>#FFFFFF</code></td><td>Card and visual backgrounds</td></tr>
+        <tr><td>Border</td><td><span class="sw" style="background:#E0E4EC"></span><code>#E0E4EC</code></td><td>Card outlines and gridlines (lightweight)</td></tr>
+        <tr><td>Success</td><td><span class="sw" style="background:#10B981"></span><code>#10B981</code></td><td>Match rate on target, healthy API latency</td></tr>
+        <tr><td>Warning</td><td><span class="sw" style="background:#F59E0B"></span><code>#F59E0B</code></td><td>Partial coverage, rate-limit proximity</td></tr>
+        <tr><td>Danger</td><td><span class="sw" style="background:#DC2626"></span><code>#DC2626</code></td><td>Orphans, refresh failures, zero match</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Typography</h3>
+    <ul>
+      <li><strong>Font:</strong> Segoe UI at dataset default; do not mix decorative display fonts.</li>
+      <li><strong>Report title:</strong> 18–20 pt semibold, brand dark.</li>
+      <li><strong>Page section headers:</strong> 12–13 pt bold.</li>
+      <li><strong>Body and axis labels:</strong> 10–11 pt regular, muted gray for secondary labels.</li>
+      <li><strong>KPI values:</strong> 24–28 pt bold, dark text; keep sub-labels one size smaller.</li>
+    </ul>
+  </section>
+
+  <section id="layout">
+    <h2>Page layout grid</h2>
+    <ul>
+      <li><strong>Canvas:</strong> 1280–1440 px logical width; 16 px gutters between visuals.</li>
+      <li><strong>Top band:</strong> Optional 48 px title row (dark fill or white with bottom rule in brand red).</li>
+      <li><strong>Slicers:</strong> Single horizontal bar under title; sync across pages for POC set, date range, and object.</li>
+      <li><strong>KPI row:</strong> Six tiles maximum on executive summary; Task 2 prioritizes: POC account count, objects queried, overall match rate, orphan count, last refresh status, API error count.</li>
+      <li><strong>Detail tables:</strong> Full width below fold; zebra striping off (use subtle row lines only).</li>
+    </ul>
+  </section>
+
+  <section id="visuals">
+    <h2>Charts and KPI rules</h2>
+    <ul>
+      <li><strong>Bar and column:</strong> Brand blue for primary series; brand red only for emphasis (for example, unmatched segment).</li>
+      <li><strong>Match rate:</strong> Use horizontal bar or gauge with explicit 0–100% axis; never crop the axis to exaggerate.</li>
+      <li><strong>Matrix (object coverage):</strong> Conditional formatting: green &gt;80%, amber 30–80%, red &lt;30% match rate; document thresholds in tooltip.</li>
+      <li><strong>Line (delta):</strong> Neutral blue line, markers only if fewer than 30 points.</li>
+    </ul>
+  </section>
+
+  <section id="semantics">
+    <h2>Semantic labels (Task 2)</h2>
+    <table>
+      <thead><tr><th>Measure</th><th>Definition (conceptual)</th><th>Visual treatment</th></tr></thead>
+      <tbody>
+        <tr><td>POC Account Count</td><td>Distinct SIDs in POC Master after validation</td><td>Neutral KPI</td></tr>
+        <tr><td>Matched Accounts</td><td>Accounts with at least one child row in the selected object</td><td>Success tone in subtitle when 100%</td></tr>
+        <tr><td>Match rate %</td><td>Matched / POC Account Count for that object</td><td>Primary KPI with percent format</td></tr>
+        <tr><td>Orphan count</td><td>POC accounts with zero rows across all in-scope objects (after rules)</td><td>Danger tone if &gt;0</td></tr>
+        <tr><td>API health</td><td>Binary or score from last refresh errors / latency</td><td>Green vs red text card</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="access">
+    <h2>Accessibility</h2>
+    <ul>
+      <li>Maintain <strong>4.5:1</strong> contrast for text on white; avoid light gray smaller than 10 pt on white.</li>
+      <li>Do not rely on color alone: add icons or text cues (“High risk”, “OK”) next to conditional colors.</li>
+      <li>Tab order: slicers left-to-right, then KPIs, then primary grid.</li>
+    </ul>
+  </section>
+
+  <section id="governance">
+    <h2>Governance and export</h2>
+    <ul>
+      <li><strong>Watermark:</strong> “Confidential — POC” on summary pages for mid-review.</li>
+      <li><strong>PDF:</strong> Use a bookmark layout with 12 pt minimum on print-optimized duplicates of key pages.</li>
+      <li><strong>Drillthrough:</strong> Account detail page receives SID from matrix; show POC Record Name from POC Master dimension only (no PII expansion beyond scope).</li>
+    </ul>
+    <p style="margin-top:20px;font-size:12px;">Related: <a href="task2-child-records-match-job-aide.html">Task 2 job aide</a> · <a href="../enhancements.html">Enhancements</a> · <a href="../job-aide-hub.html">Hub</a></p>
+  </section>
+
+  <section id="assets">
+    <h2>Downloadable assets</h2>
+    <p>Pack files for theming and for the wider POC program. Pick a tab, then download (offline-safe).</p>
+    <div class="asset-dock" id="asset-dock">
+      <h3>Files</h3>
+      <p class="sub">Mirrors <code>guides/assets/</code> and the job aide hub.</p>
+      <div class="asset-tabrow" role="tablist" aria-label="Asset downloads">
+        <button type="button" class="asset-tab active" role="tab" aria-selected="true" data-tab="poc">POC template</button>
+        <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="child">Child catalog</button>
+        <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="brand">Brand tokens</button>
+        <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="check">Build checklist</button>
+      </div>
+      <div class="asset-panes">
+        <div class="asset-pane active" data-panel="poc" role="tabpanel">
+          <div class="fname">poc-master-template.csv</div>
+          <p><code>SID</code> + <code>POC_Record_Name</code> starter for the POC Master workbook.</p>
+          <button type="button" class="dl" data-asset="poc">Download CSV</button>
+        </div>
+        <div class="asset-pane" data-panel="child" role="tabpanel">
+          <div class="fname">child-objects-catalog.csv</div>
+          <p>Child object list and anchor patterns for Task 2 SOQL.</p>
+          <button type="button" class="dl" data-asset="child">Download CSV</button>
+        </div>
+        <div class="asset-pane" data-panel="brand" role="tabpanel">
+          <div class="fname">brand-tokens.json</div>
+          <p>JSON aligned to the color and type tables above.</p>
+          <button type="button" class="dl sec" data-asset="brand">Download JSON</button>
+        </div>
+        <div class="asset-pane" data-panel="check" role="tabpanel">
+          <div class="fname">mid-review-build-checklist.txt</div>
+          <p>Shared build and review checklist.</p>
+          <button type="button" class="dl sec" data-asset="check">Download TXT</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<script id="csv-child" type="text/plain">
+object_label,suggested_api_name,anchor_field,pattern_notes,verify_in_org
+Account,Account,Id,POC SID joins to Account.Id; use for labels and hierarchy,true
+Account Campaign Association,Account_Campaign_Association__c,Account__c_or_AccountId,Confirm actual relationship field name in Object Manager,true
+AccountContactRole,AccountContactRole,AccountId,Standard junction to Contact,true
+AccountFeed,AccountFeed,ParentId,Chatter feed for Account; high volume — consider date filter,true
+AccountHistory,AccountHistory,AccountId,Field history; can be large — filter by date if allowed,true
+AccountShare,AccountShare,AccountId,Sharing rows; usually admin-only visibility in reports — confirm REST access,false
+AccountTeamMember,AccountTeamMember,AccountId,Team members tied to Account,true
+Address,Address__c,Parent_Account_or_Account__c,Confirm lookup API name on custom object,true
+Borrower Risk Rating,Borrower_Risk_Rating__c,Account__c,Confirm lookup API name,true
+Contact,Contact,AccountId,Primary child for most POCs,true
+Covid Customer Relief Tracker,Covid_Customer_Relief_Tracker__c,Account__c,Confirm lookup API name,true
+Credit Memo Narrative,Credit_Memo_Narrative__c,Account__c,Confirm lookup API name,true
+Event,Event,WhatId_or_AccountId,Often WhatId = Account Id; validate in your org,true
+FeedItem,FeedItem,ParentId,Polymorphic parent; filter Parent.Type = 'Account' and ParentId IN POC set,true
+Field History,Field_History__c,Account__c,Confirm lookup API name,true
+Lead,Lead,ConvertedAccountId_or_none,Optional — use ConvertedAccountId if available,false
+LLC BI Account Collateral,LLC_BI__Account_Collateral__c,LLC_BI__Account__c_or_Account__c,Confirm package namespace and lookup,true
+LLC BI Account Covenant,LLC_BI__Account_Covenant__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Account Document,LLC_BI__AccountDocument__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Connection,LLC_BI__Connection__c,From_Account__c_To_Account__c,Decide which side matches POC SID,true
+LLC BI Covenant2,LLC_BI__Covenant2__c,Account_or_Loan_lookup,Confirm parent object for covenant row,true
+LLC BI Loan,LLC_BI__Loan__c,LLC_BI__Account__c,Confirm field name,true
+Loan Application,Loan_Application__c,Account__c,Confirm lookup API name,true
+Loan Clone,Loan_Clone__c,Account__c,Confirm lookup API name,true
+Note,Note,ParentId,Polymorphic — filter ParentId IN POC Account Ids and IsDeleted=false,true
+Opportunity,Opportunity,AccountId,Standard child of Account,true
+PLNDR RA PL Relationship Details,PLNDR_RA_PL_Relationship_Details__c,Account__c,Verify spelling in org,true
+Relationship Planning,Relationship_Planning__c,Account__c,Confirm lookup API name,true
+Requests,Requests__c,Account__c,Confirm lookup API name,true
+Task,Task,WhatId_or_AccountId,Validate which field your org populates for Account-linked tasks,true
+TM CDD Onboarding,TM_CDD_Onboarding__c,Account__c,Confirm lookup API name,true
+</script>
+<script id="txt-check" type="text/plain">
+Mid-review build checklist — TD Banking Intelligence Suite
+Date target: May 26, 2026
+
+Task 2 — POC Child Records Match (build first)
+[ ] POC Master spreadsheet uses columns SID and POC_Record_Name (or mapped in Power Query)
+[ ] All Account Ids normalized: trim, upper, validate length 15 or 18
+[ ] OAuth token in a single cached query (gateway credentials for secrets)
+[ ] SOQL IN batches capped at ~200 Ids per request; union results
+[ ] Pagination implemented for objects returning >2000 rows
+[ ] Match-rate KPI per in-scope child object
+[ ] Orphan page: POC accounts with zero related rows across objects
+[ ] Refresh failure UX: try/otherwise with logged error table
+
+Task 1 — User dashboard
+[ ] RLS roles tested per LOB (SBB, SBCAT, Treasury, CIE LOD)
+[ ] Report CSVs versioned or latest file pattern documented
+[ ] Executive summary page + phone layout smoke test
+
+Shared
+[ ] Theme JSON applied from brand tokens; semantic colors for good/warn/bad
+[ ] No secrets in M code; gateway or dataset credentials only
+</script>
+<script>
+(function(){
+  const brandJson = JSON.stringify({
+    name: "Blackflow Cloud / TD Banking — Power BI",
+    colors: {
+      brandRed: "#ED1D24", brandDark: "#1A1A2E", brandBlue: "#0066CC",
+      pageBackground: "#F4F5F7", surface: "#FFFFFF", border: "#E0E4EC",
+      textPrimary: "#2C2C3E", textMuted: "#6B7280", success: "#10B981",
+      warning: "#F59E0B", accentPurple: "#7C3AED"
+    },
+    typography: {
+      fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+      titleReport: "20pt semibold", pageTitle: "14pt bold", body: "10–11pt", dataLabels: "9pt"
+    },
+    layout: { canvasMaxWidthPx: 1440, gridMarginPx: 16, kpiMinHeightPx: 72 }
+  }, null, 2);
+  const poc = "SID,POC_Record_Name\n001000000000000AAA,Replace with your POC label\n001000000000001AAA,Second example row\n";
+  var elC = document.getElementById('csv-child');
+  var elT = document.getElementById('txt-check');
+  const child = elC ? elC.textContent.trim() : '';
+  const check = elT ? elT.textContent.trim() : '';
+  const map = { poc: poc, child: child, brand: brandJson, check: check };
+  const names = { poc: 'poc-master-template.csv', child: 'child-objects-catalog.csv', brand: 'brand-tokens.json', check: 'mid-review-build-checklist.txt' };
+  var dock = document.getElementById('asset-dock');
+  function downloadKey(k) {
+    var body = map[k];
+    if (!body) return;
+    var mime = k === 'brand' ? 'application/json' : k === 'child' || k === 'poc' ? 'text/csv' : 'text/plain';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: mime + ';charset=utf-8' }));
+    a.download = names[k];
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  if (dock) {
+    dock.addEventListener('click', function(ev) {
+      var tab = ev.target.closest('.asset-tab');
+      if (tab && dock.contains(tab)) {
+        var id = tab.getAttribute('data-tab');
+        dock.querySelectorAll('.asset-tab').forEach(function(t) {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+        });
+        dock.querySelectorAll('.asset-pane').forEach(function(p) {
+          p.classList.toggle('active', p.getAttribute('data-panel') === id);
+        });
+        return;
+      }
+      var btn = ev.target.closest('button.dl[data-asset]');
+      if (btn && dock.contains(btn)) downloadKey(btn.getAttribute('data-asset'));
+    });
+  }
+})();
+</script>
+</body>
+</html>

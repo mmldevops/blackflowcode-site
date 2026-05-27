@@ -1,0 +1,21 @@
+Mid-review build checklist — TD Banking Intelligence Suite
+Date target: May 26, 2026
+
+Task 2 — POC Child Records Match (build first)
+[ ] POC Master spreadsheet uses columns SID and POC_Record_Name (or mapped in Power Query)
+[ ] All Account Ids normalized: trim, upper, validate length 15 or 18
+[ ] OAuth token in a single cached query (gateway credentials for secrets)
+[ ] SOQL IN batches capped at ~200 Ids per request; union results
+[ ] Pagination implemented for objects returning >2000 rows
+[ ] Match-rate KPI per in-scope child object
+[ ] Orphan page: POC accounts with zero related rows across objects
+[ ] Refresh failure UX: try/otherwise with logged error table
+
+Task 1 — User dashboard
+[ ] RLS roles tested per LOB (SBB, SBCAT, Treasury, CIE LOD)
+[ ] Report CSVs versioned or “latest file” pattern documented
+[ ] Executive summary page + phone layout smoke test
+
+Shared
+[ ] Theme JSON applied from brand tokens; semantic colors for good/warn/bad
+[ ] No secrets in M code; gateway or dataset credentials only

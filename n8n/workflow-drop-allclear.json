@@ -1,0 +1,78 @@
+{
+  "name": "BFC — Drop All-Clear → Slack Release-Ready Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "schema": "public",
+        "tableName": "drops",
+        "events": ["update"]
+      },
+      "name": "Supabase Trigger",
+      "type": "n8n-nodes-base.supabaseTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"new\"][\"status\"]}}",
+              "operation": "equal",
+              "value2": "rc"
+            }
+          ]
+        }
+      },
+      "name": "IF — status=rc",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "schema": "public",
+        "tableName": "blueprints",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{$json[\"new\"][\"blueprint_id\"]}}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "name": "Supabase — Fetch Blueprint",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "webhookUri": "={{$env[\"SLACK_WEBHOOK_URL\"]}}",
+        "text": "=:white_check_mark: *RELEASE READY*\nBlueprint: {{$json[0][\"name\"]}}\nDrop: v{{$node[\"Supabase Trigger\"].json[\"new\"][\"version\"]}}\nSignals deployed: {{$node[\"Supabase Trigger\"].json[\"new\"][\"deployed_count\"]}} / {{$node[\"Supabase Trigger\"].json[\"new\"][\"signal_count\"]}}\nTarget date: {{$node[\"Supabase Trigger\"].json[\"new\"][\"target_date\"]}}\nAction: Review RC and flip status → released"
+      },
+      "name": "Slack — Release Ready Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [900, 220]
+    }
+  ],
+  "connections": {
+    "Supabase Trigger": {
+      "main": [[{"node": "IF — status=rc", "type": "main", "index": 0}]]
+    },
+    "IF — status=rc": {
+      "main": [[{"node": "Supabase — Fetch Blueprint", "type": "main", "index": 0}]]
+    },
+    "Supabase — Fetch Blueprint": {
+      "main": [[{"node": "Slack — Release Ready Alert", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": ["bfc-release-tracker"]
+}

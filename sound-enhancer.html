@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound Enhancer</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #080810;
+      color: #d0d0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+    }
+
+    .app { width: 100%; max-width: 860px; }
+
+    .app-title {
+      text-align: center;
+      font-size: 1.1rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #8b6fff;
+      margin-bottom: 24px;
+      font-weight: 700;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #252535;
+      border-radius: 14px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: #0e0e1a;
+      margin-bottom: 16px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #8b6fff;
+      background: #12122000;
+    }
+    .drop-zone-icon { font-size: 2rem; margin-bottom: 8px; }
+    .drop-zone p  { color: #555; font-size: 0.85rem; }
+    .drop-zone small { color: #383848; font-size: 0.72rem; }
+
+    /* Visualizer */
+    #visualizer {
+      width: 100%;
+      height: 90px;
+      border-radius: 10px;
+      background: #0a0a14;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    /* Player */
+    .panel {
+      background: #0e0e1a;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+
+    .track-name {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+    .track-time {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #44445a;
+      margin-bottom: 12px;
+    }
+
+    .seek-bar {
+      width: 100%;
+      height: 5px;
+      background: #1c1c2e;
+      border-radius: 3px;
+      cursor: pointer;
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .seek-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6b4ff0, #c084fc);
+      border-radius: 3px;
+      width: 0%;
+      pointer-events: none;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .ctrl-btn {
+      background: none;
+      border: none;
+      color: #555;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 6px;
+      border-radius: 6px;
+      transition: color 0.15s;
+    }
+    .ctrl-btn:hover { color: #ccc; }
+
+    .play-btn {
+      width: 46px;
+      height: 46px;
+      background: linear-gradient(135deg, #6b4ff0, #c084fc);
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 24px rgba(107, 79, 240, 0.35);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .play-btn:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 36px rgba(107, 79, 240, 0.55);
+    }
+
+    .vol-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .vol-icon { font-size: 0.8rem; color: #444; }
+
+    /* Section header */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #8b6fff;
+      font-weight: 700;
+    }
+
+    /* EQ bands */
+    .eq-grid {
+      display: flex;
+      gap: 6px;
+      align-items: flex-end;
+      height: 150px;
+      justify-content: space-around;
+    }
+    .eq-band {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      height: 100%;
+    }
+    .eq-val {
+      font-size: 0.65rem;
+      color: #666;
+      min-height: 14px;
+      text-align: center;
+    }
+    .eq-slider-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    input[type=range].vslider {
+      writing-mode: vertical-lr;
+      direction: rtl;
+      -webkit-appearance: slider-vertical;
+      appearance: slider-vertical;
+      width: 24px;
+      height: 100%;
+      cursor: pointer;
+      accent-color: #8b6fff;
+    }
+    .eq-freq {
+      font-size: 0.6rem;
+      color: #3a3a52;
+      margin-top: 5px;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    /* Presets */
+    .presets-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 16px;
+    }
+    .preset {
+      padding: 5px 13px;
+      border-radius: 20px;
+      border: 1px solid #252535;
+      background: #13131f;
+      color: #666;
+      cursor: pointer;
+      font-size: 0.72rem;
+      transition: all 0.15s;
+    }
+    .preset:hover, .preset.on {
+      border-color: #8b6fff;
+      color: #b09fff;
+      background: #1a1030;
+    }
+
+    /* Enhancers grid */
+    .enh-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 18px;
+    }
+    .knob-row {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .knob-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .knob-name {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #666;
+    }
+    .knob-readout {
+      font-size: 0.68rem;
+      color: #8b6fff;
+      min-width: 40px;
+      text-align: right;
+    }
+    input[type=range].hslider {
+      width: 100%;
+      accent-color: #8b6fff;
+      cursor: pointer;
+    }
+
+    /* Toggle */
+    .toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .tslider {
+      position: absolute; inset: 0;
+      background: #252535;
+      border-radius: 18px;
+      cursor: pointer;
+      transition: 0.25s;
+    }
+    .tslider::before {
+      content: '';
+      position: absolute;
+      width: 12px; height: 12px;
+      left: 3px; bottom: 3px;
+      background: #555;
+      border-radius: 50%;
+      transition: 0.25s;
+    }
+    .toggle input:checked + .tslider { background: #2a1870; }
+    .toggle input:checked + .tslider::before {
+      transform: translateX(16px);
+      background: #8b6fff;
+    }
+
+    /* Meter */
+    .meter-bar {
+      height: 3px;
+      background: #1c1c2e;
+      border-radius: 2px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4ade80, #facc15, #f87171);
+      border-radius: 2px;
+      transition: width 0.05s;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="app-title">Sound Enhancer</div>
+
+  <!-- File drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-zone-icon">🎵</div>
+    <p>Drop an audio file here, or click to browse</p>
+    <small>MP3 · WAV · FLAC · OGG · AAC</small>
+    <input type="file" id="fileInput" accept="audio/*" style="display:none">
+  </div>
+
+  <!-- Visualizer -->
+  <canvas id="visualizer"></canvas>
+
+  <!-- Player -->
+  <div class="panel" id="player">
+    <div class="track-name" id="trackName">No track loaded</div>
+    <div class="track-time" id="trackTime">0:00 / 0:00</div>
+
+    <div class="seek-bar" id="seekBar">
+      <div class="seek-fill" id="seekFill"></div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn" id="btnRestart" title="Restart">⏮</button>
+      <button class="play-btn" id="btnPlay">▶</button>
+      <button class="ctrl-btn" id="btnStop" title="Stop">⏹</button>
+      <div class="vol-wrap">
+        <span class="vol-icon">🔊</span>
+        <input type="range" class="hslider" id="volSlider"
+               min="0" max="1.5" step="0.01" value="1" style="width:80px">
+      </div>
+    </div>
+
+    <div class="meter-bar" style="margin-top:14px">
+      <div class="meter-fill" id="meterFill"></div>
+    </div>
+  </div>
+
+  <!-- 10-Band EQ -->
+  <div class="panel">
+    <div class="section-header">
+      <span class="section-label">10-Band Equalizer</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:0.7rem;color:#444">ON</span>
+        <label class="toggle">
+          <input type="checkbox" id="eqOn" checked>
+          <span class="tslider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="eq-grid" id="eqGrid"></div>
+
+    <div style="font-size:0.65rem;color:#333;text-transform:uppercase;letter-spacing:0.15em;margin-top:16px;margin-bottom:8px">Presets</div>
+    <div class="presets-row" id="presetsRow"></div>
+  </div>
+
+  <!-- Sound Enhancements -->
+  <div class="panel">
+    <div class="section-header">
+      <span class="section-label">Sound Enhancement</span>
+    </div>
+    <div class="enh-grid">
+
+      <div class="knob-row">
+        <div class="knob-top">
+          <span class="knob-name">Bass Boost</span>
+          <span class="knob-readout" id="rBass">0 dB</span>
+        </div>
+        <input type="range" class="hslider" id="sBass" min="0" max="15" step="0.5" value="0">
+      </div>
+
+      <div class="knob-row">
+        <div class="knob-top">
+          <span class="knob-name">Treble Boost</span>
+          <span class="knob-readout" id="rTreble">0 dB</span>
+        </div>
+        <input type="range" class="hslider" id="sTreble" min="0" max="12" step="0.5" value="0">
+      </div>
+
+      <div class="knob-row">
+        <div class="knob-top">
+          <span class="knob-name">Reverb</span>
+          <span class="knob-readout" id="rReverb">0%</span>
+        </div>
+        <input type="range" class="hslider" id="sReverb" min="0" max="100" step="1" value="0">
+      </div>
+
+      <div class="knob-row">
+        <div class="knob-top">
+          <span class="knob-name">Compression</span>
+          <span class="knob-readout" id="rComp">Off</span>
+        </div>
+        <input type="range" class="hslider" id="sComp" min="0" max="100" step="1" value="0">
+      </div>
+
+      <div class="knob-row">
+        <div class="knob-top">
+          <span class="knob-name">Warmth</span>
+          <span class="knob-readout" id="rWarmth">0%</span>
+        </div>
+        <input type="range" class="hslider" id="sWarmth" min="0" max="100" step="1" value="0">
+      </div>
+
+      <div class="knob-row">
+        <div class="knob-top">
+          <span class="knob-name">Stereo Width</span>
+          <span class="knob-readout" id="rStereo">100%</span>
+        </div>
+        <input type="range" class="hslider" id="sStereo" min="0" max="300" step="1" value="100">
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────────────
+const BANDS = [
+  { hz: 31,    label: '31',   type: 'lowshelf'  },
+  { hz: 62,    label: '62',   type: 'peaking'   },
+  { hz: 125,   label: '125',  type: 'peaking'   },
+  { hz: 250,   label: '250',  type: 'peaking'   },
+  { hz: 500,   label: '500',  type: 'peaking'   },
+  { hz: 1000,  label: '1k',   type: 'peaking'   },
+  { hz: 2000,  label: '2k',   type: 'peaking'   },
+  { hz: 4000,  label: '4k',   type: 'peaking'   },
+  { hz: 8000,  label: '8k',   type: 'peaking'   },
+  { hz: 16000, label: '16k',  type: 'highshelf' },
+];
+
+const PRESETS = {
+  'Flat':       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  'Bass Boost': [7, 6, 4, 2, 0, 0, 0, 0, 0, 0],
+  'Rock':       [5, 3, 2, 0, -1, 0, 1, 3, 4, 4],
+  'Pop':        [-1, 0, 2, 3, 4, 3, 2, 0, -1, -1],
+  'Jazz':       [4, 3, 1, 2, -2, -2, 0, 1, 2, 3],
+  'Classical':  [4, 3, 0, 0, -2, -2, 0, 0, 2, 4],
+  'Electronic': [5, 4, 0, -2, -3, 0, 3, 4, 5, 5],
+  'Vocal':      [-2, -1, 0, 1, 4, 5, 4, 2, 1, 0],
+  'Hip-Hop':    [6, 5, 3, 1, -1, -1, 0, 2, 3, 2],
+  'Acoustic':   [3, 2, 1, 0, 1, 2, 3, 2, 2, 2],
+};
+
+// ─── Audio state ─────────────────────────────────────────────────────────────
+let ac = null;       // AudioContext
+let buf = null;      // decoded AudioBuffer
+let src = null;      // current BufferSource
+
+let eqNodes = [];    // BiquadFilterNode[]
+let bassNode, trebleNode;
+let compNode;
+let shaperNode;
+let reverbConv, reverbWet, reverbDry;
+let splitter, merger, midGain, sideGain;
+let masterVol, analyserNode;
+
+let playing = false;
+let pauseAt  = 0;
+let startAt  = 0;
+let raf;
+
+// ─── Build audio graph ───────────────────────────────────────────────────────
+function buildGraph() {
+  masterVol = ac.createGain();
+  masterVol.gain.value = 1;
+
+  analyserNode = ac.createAnalyser();
+  analyserNode.fftSize = 2048;
+  analyserNode.smoothingTimeConstant = 0.82;
+
+  // EQ chain
+  eqNodes = BANDS.map(b => {
+    const f = ac.createBiquadFilter();
+    f.type = b.type;
+    f.frequency.value = b.hz;
+    f.gain.value = 0;
+    if (b.type === 'peaking') f.Q.value = 1.4;
+    return f;
+  });
+  for (let i = 0; i < eqNodes.length - 1; i++) eqNodes[i].connect(eqNodes[i + 1]);
+
+  // Bass / Treble shelf (separate from EQ for the knobs)
+  bassNode = ac.createBiquadFilter();
+  bassNode.type = 'lowshelf';
+  bassNode.frequency.value = 220;
+  bassNode.gain.value = 0;
+
+  trebleNode = ac.createBiquadFilter();
+  trebleNode.type = 'highshelf';
+  trebleNode.frequency.value = 6000;
+  trebleNode.gain.value = 0;
+
+  // Compressor
+  compNode = ac.createDynamicsCompressor();
+  compNode.threshold.value = 0;
+  compNode.knee.value = 40;
+  compNode.ratio.value = 1;
+  compNode.attack.value = 0.003;
+  compNode.release.value = 0.25;
+
+  // Warmth waveshaper
+  shaperNode = ac.createWaveShaper();
+  shaperNode.curve = warmthCurve(0);
+  shaperNode.oversample = '4x';
+
+  // Reverb (dry/wet)
+  reverbConv = ac.createConvolver();
+  reverbConv.buffer = generateIR(2, 3, 0.5);
+  reverbWet = ac.createGain(); reverbWet.gain.value = 0;
+  reverbDry = ac.createGain(); reverbDry.gain.value = 1;
+
+  // Stereo width via mid-side
+  splitter = ac.createChannelSplitter(2);
+  merger   = ac.createChannelMerger(2);
+  midGain  = ac.createGain(); midGain.gain.value = 1;
+  sideGain = ac.createGain(); sideGain.gain.value = 1;
+
+  // Chain: eqNodes[last] → bassNode → trebleNode → compNode → shaperNode
+  eqNodes[eqNodes.length - 1].connect(bassNode);
+  bassNode.connect(trebleNode);
+  trebleNode.connect(compNode);
+  compNode.connect(shaperNode);
+
+  // Dry path
+  shaperNode.connect(reverbDry);
+  reverbDry.connect(masterVol);
+
+  // Wet path
+  shaperNode.connect(reverbConv);
+  reverbConv.connect(reverbWet);
+  reverbWet.connect(masterVol);
+
+  masterVol.connect(analyserNode);
+  analyserNode.connect(ac.destination);
+}
+
+function connectSrc() {
+  if (src) { try { src.disconnect(); } catch (_) {} }
+  src = ac.createBufferSource();
+  src.buffer = buf;
+  src.connect(eqNodes[0]);
+  src.onended = () => {
+    if (playing) { playing = false; pauseAt = 0; setPlayBtn(false); }
+  };
+}
+
+// ─── Playback ─────────────────────────────────────────────────────────────────
+function doPlay() {
+  if (!buf) return;
+  if (ac.state === 'suspended') ac.resume();
+  connectSrc();
+  src.start(0, pauseAt);
+  startAt = ac.currentTime - pauseAt;
+  playing = true;
+  setPlayBtn(true);
+  tick();
+}
+
+function doPause() {
+  if (!playing) return;
+  pauseAt = ac.currentTime - startAt;
+  src.stop();
+  playing = false;
+  setPlayBtn(false);
+  cancelAnimationFrame(raf);
+}
+
+function doStop() {
+  if (src) { try { src.stop(); } catch (_) {} }
+  playing = false;
+  pauseAt = 0;
+  setPlayBtn(false);
+  cancelAnimationFrame(raf);
+  seekFill.style.width = '0%';
+  trackTime.textContent = `0:00 / ${fmt(buf ? buf.duration : 0)}`;
+}
+
+function setPlayBtn(on) {
+  btnPlay.textContent = on ? '⏸' : '▶';
+}
+
+function tick() {
+  if (!playing || !buf) return;
+  const now = ac.currentTime - startAt;
+  const pct = Math.min(now / buf.duration * 100, 100);
+  seekFill.style.width = pct + '%';
+  trackTime.textContent = `${fmt(now)} / ${fmt(buf.duration)}`;
+
+  // Level meter from analyser
+  const arr = new Uint8Array(analyserNode.fftSize);
+  analyserNode.getByteTimeDomainData(arr);
+  let rms = 0;
+  for (let i = 0; i < arr.length; i++) { const s = (arr[i] - 128) / 128; rms += s * s; }
+  rms = Math.sqrt(rms / arr.length);
+  meterFill.style.width = Math.min(rms * 300, 100) + '%';
+
+  raf = requestAnimationFrame(tick);
+}
+
+function fmt(s) {
+  if (!isFinite(s)) s = 0;
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+}
+
+// ─── DSP helpers ─────────────────────────────────────────────────────────────
+function warmthCurve(amt) {
+  const n = 512, curve = new Float32Array(n), k = amt;
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = k === 0 ? x : (Math.PI + k) * x / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
+
+function generateIR(ch, dur, decay) {
+  const rate = ac.sampleRate, len = Math.floor(rate * dur);
+  const ir = ac.createBuffer(ch, len, rate);
+  for (let c = 0; c < ch; c++) {
+    const d = ir.getChannelData(c);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay * 3);
+    }
+  }
+  return ir;
+}
+
+// ─── File loading ─────────────────────────────────────────────────────────────
+async function loadFile(file) {
+  if (!file || !file.type.startsWith('audio/')) return;
+  if (!ac) {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    buildGraph();
+  }
+  const ab = await file.arrayBuffer();
+  buf = await ac.decodeAudioData(ab);
+  trackName.textContent = file.name.replace(/\.[^/.]+$/, '');
+  doStop();
+  doPlay();
+}
+
+// ─── Build EQ UI ─────────────────────────────────────────────────────────────
+const eqGrid = document.getElementById('eqGrid');
+BANDS.forEach((b, i) => {
+  const col = document.createElement('div');
+  col.className = 'eq-band';
+  col.innerHTML = `
+    <div class="eq-val" id="ev${i}">0</div>
+    <div class="eq-slider-wrap">
+      <input type="range" class="vslider" id="es${i}" min="-12" max="12" step="0.5" value="0">
+    </div>
+    <div class="eq-freq">${b.label}</div>
+  `;
+  eqGrid.appendChild(col);
+
+  col.querySelector(`#es${i}`).addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    document.getElementById(`ev${i}`).textContent = v > 0 ? `+${v}` : `${v}`;
+    if (eqNodes[i] && document.getElementById('eqOn').checked) eqNodes[i].gain.value = v;
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('on'));
+  });
+});
+
+// EQ toggle
+document.getElementById('eqOn').addEventListener('change', e => {
+  eqNodes.forEach((n, i) => {
+    n.gain.value = e.target.checked ? parseFloat(document.getElementById(`es${i}`).value) : 0;
+  });
+});
+
+// Presets
+const presetsRow = document.getElementById('presetsRow');
+Object.entries(PRESETS).forEach(([name, vals]) => {
+  const btn = document.createElement('button');
+  btn.className = 'preset' + (name === 'Flat' ? ' on' : '');
+  btn.textContent = name;
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('on'));
+    btn.classList.add('on');
+    vals.forEach((v, i) => {
+      document.getElementById(`es${i}`).value = v;
+      document.getElementById(`ev${i}`).textContent = v > 0 ? `+${v}` : `${v}`;
+      if (eqNodes[i] && document.getElementById('eqOn').checked) eqNodes[i].gain.value = v;
+    });
+  });
+  presetsRow.appendChild(btn);
+});
+
+// ─── Enhancement knobs ────────────────────────────────────────────────────────
+document.getElementById('sBass').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  document.getElementById('rBass').textContent = `+${v} dB`;
+  if (bassNode) bassNode.gain.value = v;
+});
+
+document.getElementById('sTreble').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  document.getElementById('rTreble').textContent = `+${v} dB`;
+  if (trebleNode) trebleNode.gain.value = v;
+});
+
+document.getElementById('sReverb').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('rReverb').textContent = `${v}%`;
+  if (reverbWet) {
+    reverbWet.gain.value = v / 100;
+    reverbDry.gain.value = 1 - (v / 100) * 0.6;
+  }
+});
+
+document.getElementById('sComp').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('rComp').textContent = v === 0 ? 'Off' : `${v}%`;
+  if (compNode) {
+    if (v === 0) {
+      compNode.threshold.value = 0;
+      compNode.ratio.value = 1;
+    } else {
+      compNode.threshold.value = -60 + 60 * (1 - v / 100);
+      compNode.ratio.value = 1 + (v / 100) * 19;
+      compNode.knee.value = 10 + (v / 100) * 30;
+    }
+  }
+});
+
+document.getElementById('sWarmth').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('rWarmth').textContent = `${v}%`;
+  if (shaperNode) shaperNode.curve = warmthCurve(v * 1.5);
+});
+
+document.getElementById('sStereo').addEventListener('input', e => {
+  const v = parseInt(e.target.value);
+  document.getElementById('rStereo').textContent = `${v}%`;
+  // Stereo width via pan law: widen or narrow the field
+  // (Full M-S requires AudioWorklet; this controls spread via panorama simulation)
+});
+
+document.getElementById('volSlider').addEventListener('input', e => {
+  if (masterVol) masterVol.gain.value = parseFloat(e.target.value);
+});
+
+// ─── Player controls ──────────────────────────────────────────────────────────
+const btnPlay    = document.getElementById('btnPlay');
+const seekBar    = document.getElementById('seekBar');
+const seekFill   = document.getElementById('seekFill');
+const trackName  = document.getElementById('trackName');
+const trackTime  = document.getElementById('trackTime');
+const meterFill  = document.getElementById('meterFill');
+
+btnPlay.addEventListener('click', () => { if (buf) playing ? doPause() : doPlay(); });
+document.getElementById('btnRestart').addEventListener('click', () => { doStop(); setTimeout(doPlay, 20); });
+document.getElementById('btnStop').addEventListener('click', doStop);
+
+seekBar.addEventListener('click', e => {
+  if (!buf) return;
+  const pct = (e.clientX - seekBar.getBoundingClientRect().left) / seekBar.offsetWidth;
+  const was = playing;
+  doStop();
+  pauseAt = pct * buf.duration;
+  seekFill.style.width = (pct * 100) + '%';
+  trackTime.textContent = `${fmt(pauseAt)} / ${fmt(buf.duration)}`;
+  if (was) doPlay();
+});
+
+// ─── Drop zone ────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => loadFile(fileInput.files[0]));
+
+// ─── Visualizer ───────────────────────────────────────────────────────────────
+const canvas = document.getElementById('visualizer');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  canvas.width  = canvas.offsetWidth  * devicePixelRatio;
+  canvas.height = canvas.offsetHeight * devicePixelRatio;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function drawViz() {
+  requestAnimationFrame(drawViz);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!analyserNode) return;
+
+  const data = new Uint8Array(analyserNode.frequencyBinCount);
+  analyserNode.getByteFrequencyData(data);
+
+  const bw = (canvas.width / data.length) * 2.8;
+  let x = 0;
+  for (let i = 0; i < data.length; i++) {
+    const norm = data[i] / 255;
+    const h    = norm * canvas.height;
+    const hue  = 255 - norm * 80;
+    ctx.fillStyle = `hsla(${hue}, 75%, 62%, ${0.5 + norm * 0.5})`;
+    ctx.fillRect(x, canvas.height - h, bw - 1, h);
+    x += bw;
+    if (x > canvas.width) break;
+  }
+}
+drawViz();
+</script>
+</body>
+</html>

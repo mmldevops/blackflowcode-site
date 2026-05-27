@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bfc-best-va — Validation, cleansing &amp; Power BI excellence</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;--ok:#059669;--warn:#D97706;--shadow:0 2px 12px rgba(0,0,0,.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px;}
+nav{background:var(--white);border-bottom:1px solid var(--border);padding:10px 22px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;position:sticky;top:0;z-index:40;}
+nav .nh{color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:10px;}
+nav a{color:var(--blue);font-weight:600;text-decoration:none;}
+nav a:hover{text-decoration:underline;}
+header{background:var(--dark);color:#fff;padding:18px 22px;border-bottom:3px solid var(--red);}
+header h1{font-size:17px;font-weight:800;}
+header p{font-size:12px;color:#94A3B8;margin-top:8px;max-width:900px;}
+.badge{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:14px;margin-top:10px;letter-spacing:.04em;}
+main{max-width:920px;margin:0 auto;padding:24px 20px 64px;}
+.toc{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin:20px 0;box-shadow:var(--shadow);}
+.toc h2{margin:0 0 10px;font-size:15px;color:var(--dark);border:none;padding:0;}
+.toc ol{margin:0;padding-left:22px;font-size:13px;color:var(--muted);}
+.toc a{color:var(--blue);font-weight:600;}
+h2{font-size:17px;color:var(--dark);margin:36px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--border);}
+h2:first-of-type{margin-top:8px;}
+h3{font-size:14px;color:var(--dark);margin:20px 0 8px;}
+p,li{font-size:13px;color:var(--muted);margin:8px 0;}
+ul{padding-left:20px;}
+.callout{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:10px;padding:14px 16px;margin:14px 0;box-shadow:var(--shadow);}
+.callout.ok{border-left-color:var(--ok);}
+.callout.warn{border-left-color:var(--warn);}
+.callout strong{color:var(--dark);}
+table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:12px 0;font-size:12px;box-shadow:var(--shadow);}
+th,td{padding:9px 11px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+th{background:var(--dark);color:#fff;font-weight:600;}
+tr:last-child td{border-bottom:none;}
+code,kbd{font-family:'Cascadia Code','Consolas',monospace;font-size:11.5px;background:rgba(0,102,204,.09);padding:1px 5px;border-radius:4px;}
+pre{background:#1E1E2E;color:#E2E8F0;padding:14px 16px;border-radius:8px;overflow-x:auto;font-size:11.5px;line-height:1.45;margin:12px 0;}
+pre code{background:transparent;padding:0;color:inherit;}
+.grid2{display:grid;gap:12px;margin-top:10px;}
+@media(min-width:780px){.grid2{grid-template-columns:1fr 1fr;}}
+.card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px;box-shadow:var(--shadow);}
+.card h4{font-size:13px;font-weight:800;color:var(--dark);margin:0 0 8px;}
+.chk{background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:14px 16px;margin:14px 0;}
+.chk h3{margin-top:0;color:#166534;font-size:14px;}
+.chk ul{margin:0;}
+footer{text-align:center;padding:22px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:40px;}
+footer a{color:var(--blue);font-weight:600;}
+.sec-num{display:inline-block;background:var(--blue);color:#fff;font-size:10px;font-weight:800;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;margin-right:8px;}
+</style>
+</head>
+<body>
+<nav aria-label="Related guides">
+  <span class="nh">Navigate</span>
+  <a href="../job-aide-hub.html">Hub</a>
+  <a href="../enhancements.html">Enhancements</a>
+  <a href="enhancements-playbook.html">Playbook</a>
+  <a href="../queries-job-aide.html">M library</a>
+  <a href="salesforce-multi-object-fn-guide.html">FN guide</a>
+  <a href="bfc-doc-p2.html">bfc-doc-p2</a>
+</nav>
+<header>
+  <h1>bfc-best-va — Validation, data excellence &amp; zero-surprise delivery</h1>
+  <p>End-to-end best practices for spreadsheet sources, Salesforce Ids, Power Query hygiene, model relationships, DirectQuery trade-offs, reusable M functions (FN), DAX discipline, conditional formatting, performance, and pre-flight checks. Built to reduce development defects and post-release findings for the TD Banking Intelligence Suite.</p>
+  <span class="badge">Blackflow Cloud · Management-ready reference</span>
+</header>
+<main>
+
+  <div class="callout ok">
+    <strong>How to use this before your review.</strong> Skim Section 0 (executive framing), enforce Sections 1–3 on every spreadsheet and Id list, bake Sections 4–7 into the model, then run Section 12 as a hard gate before publish. Section 11 is your “wow with confidence” story: faster refresh and defensible numbers.
+  </div>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table of contents</h2>
+    <ol>
+      <li><a href="#s0">Executive framing (what management should hear)</a></li>
+      <li><a href="#s1">Spreadsheet governance (Excel / SharePoint)</a></li>
+      <li><a href="#s2">Salesforce Ids — full normalization playbook</a></li>
+      <li><a href="#s3">Power Query — transformation order &amp; quality bar</a></li>
+      <li><a href="#s4">Validation rules (PQ + model)</a></li>
+      <li><a href="#s5">Relationships: Import vs DirectQuery</a></li>
+      <li><a href="#s6">Advanced FN patterns (orchestrated M)</a></li>
+      <li><a href="#s7">DAX — measures, safety, performance</a></li>
+      <li><a href="#s8">Conditional formatting &amp; visual QA</a></li>
+      <li><a href="#s9">“Updating columns” &amp; native query boundaries</a></li>
+      <li><a href="#s10">Optimizing Power BI (refresh, size, runtime)</a></li>
+      <li><a href="#s11">Zero-defect gates &amp; audit trail</a></li>
+    </ol>
+  </nav>
+
+  <h2><span class="sec-num">0</span><span id="s0">Executive framing</span></h2>
+  <ul>
+    <li><strong>Single grain rule:</strong> every fact table row answers one question at one granularity; spreadsheets are normalized in Power Query before they touch the model.</li>
+    <li><strong>Id integrity:</strong> all Salesforce keys pass the same trim / case / length / dedupe pipeline so joins never “silently fail.”</li>
+    <li><strong>Provable refresh:</strong> gateway credentials, bounded API calls, and logged errors mean the dashboard is an operational asset, not a demo-only artifact.</li>
+    <li><strong>Defensible metrics:</strong> DAX measures carry one definition, documented in tooltips; validation tables prove row counts and orphan logic.</li>
+  </ul>
+
+  <h2><span class="sec-num">1</span><span id="s1">Spreadsheet governance</span></h2>
+  <h3>Structure</h3>
+  <ul>
+    <li>Use an <strong>Excel Table</strong> (Insert → Table) with headers on row 1 only; <strong>no merged cells</strong> in the header region.</li>
+    <li><strong>One logical table per worksheet</strong> for anything loaded to Power BI; avoid “dashboard” layouts with blank spacer rows.</li>
+    <li>Keep <code>SID</code> (or raw Id column) and <code>POC_Record_Name</code> adjacent; avoid blank columns between keys and labels.</li>
+    <li>Do not embed <strong>subtotals or outline groups</strong> in source sheets used for refresh; PQ will treat them as bad rows unless filtered.</li>
+  </ul>
+  <h3>Data types in Excel</h3>
+  <ul>
+    <li>Format Ids as <strong>Text</strong> before paste; Excel’s Scientific notation corrupts Ids.</li>
+    <li>Dates as real date serials, not text like “01-Feb-25” mixed with “2025-02-01”.</li>
+    <li>Currency and counts as numbers; never mix “N/A” in a numeric column—use empty cell or a dedicated Status column.</li>
+  </ul>
+  <h3>Conditional formatting in Excel (upstream QA)</h3>
+  <table>
+    <thead><tr><th>Rule</th><th>Formula / idea</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Id length</td><td>Highlight if LEN≠15 and LEN≠18</td><td>Catches truncation and bad paste</td></tr>
+      <tr><td>Duplicates</td><td>Conditional formatting → duplicate values on SID column</td><td>Prevents many-to-many surprises</td></tr>
+      <tr><td>Blanks</td><td>Highlight blank SID or blank POC name</td><td>Stops bad rows early</td></tr>
+      <tr><td>Characters</td><td>Custom formula: contains space or hyphen in Id (if unexpected)</td><td>Cleansing hints before PQ</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <strong>SharePoint / OneDrive:</strong> pin to a stable folder path; avoid “Copy of copy” filenames. Turn off “Open in Excel Online” structural edits during refresh windows.
+  </div>
+
+  <h2><span class="sec-num">2</span><span id="s2">Salesforce Ids — full normalization playbook</span></h2>
+  <h3>Why 15 and 18 characters both appear</h3>
+  <p>Salesforce exposes a <strong>15-character</strong> case-sensitive Id in the UI and URLs, and an <strong>18-character</strong> case-safe Id (checksum suffix) in APIs and exports. Mixing them without normalization produces missed matches when joins assume exact string equality.</p>
+  <h3>Step-by-step (repeat for every Id column)</h3>
+  <ol>
+    <li><strong>Trim</strong> leading and trailing spaces (<code>Text.Trim</code>).</li>
+    <li><strong>Remove hidden characters</strong> (CHAR 160 non-breaking space, line breaks from CSV): optional <code>Text.Clean</code> after trim.</li>
+    <li><strong>Uppercase</strong> for consistent comparison (<code>Text.Upper</code>).</li>
+    <li><strong>Validate length</strong>: keep rows where length is 15 or 18; route others to an <em>Exceptions</em> query for stewardship.</li>
+    <li><strong>Deduplicate</strong> on the canonical key column before any merge to child data.</li>
+    <li><strong>Choose one join key</strong> for the model: either normalize all to 18 (preferred when mixing sources) or normalize all to first-15 with consistent casing—do not mix strategies across tables.</li>
+  </ol>
+  <h3>Power Query pattern (conceptual)</h3>
+  <pre><code>// After rename to SID
+#"Trim Upper" = Table.TransformColumns(Source,{{"SID", each Text.Upper(Text.Trim(_)), type text}})
+#"Valid Len" = Table.SelectRows(#"Trim Upper", each Text.Length([SID]) = 15 or Text.Length([SID]) = 18)
+// Optional: add column Is18 = Text.Length([SID]) = 18
+#"Distinct POC" = Table.Distinct(#"Valid Len", {"SID"})</code></pre>
+  <p>For <strong>15→18</strong> conversion, implement a single tested M function (checksum algorithm) in one query and invoke it everywhere; do not duplicate logic across object queries.</p>
+  <h3>Join-site discipline (REST / SOQL)</h3>
+  <ul>
+    <li>SOQL <code>IN</code> lists: batch (~200 Ids) to respect URL and governor practical limits.</li>
+    <li>When matching polymorphic lookups (<code>WhatId</code>), filter by <code>Type</code> prefix or object-specific subqueries to avoid wrong joins.</li>
+    <li>Always log the <strong>batch index and HTTP status</strong> in a diagnostic table on failure (empty table schema still in model).</li>
+  </ul>
+
+  <h2><span class="sec-num">3</span><span id="s3">Power Query — transformation order &amp; quality bar</span></h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>Recommended step order</h4>
+      <ol style="margin:0;padding-left:18px;font-size:13px;color:var(--muted);">
+        <li>Source → preserve raw query as duplicate for forensics.</li>
+        <li>Promote headers / choose row 1.</li>
+        <li>Rename to stable canonical names.</li>
+        <li>Type detection then <strong>explicit types</strong>.</li>
+        <li>Clean keys (Ids, dates).</li>
+        <li>Filter to business scope.</li>
+        <li>Merge / append.</li>
+        <li>Remove columns not needed for visuals (reduces VertiPaq).</li>
+        <li>Disable load on helper queries used only as functions.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>Anti-patterns to avoid</h4>
+      <ul>
+        <li>Hard-coding org URLs or tokens in M text.</li>
+        <li>Merge before typing (hides type errors).</li>
+        <li>Loading wide “select star” REST extracts for every object.</li>
+        <li>Using <code>Table.ReplaceValue</code> on whole table for one-off fixes without documenting rule.</li>
+      </ul>
+    </div>
+  </div>
+  <p><strong>Query folding:</strong> for SQL and OData sources, keep filters early; defer irreversible steps that break folding until after filtered rows. For Salesforce REST via <code>Web.Contents</code>, folding does not apply—optimize with selective SOQL columns and server-side filters instead.</p>
+  <p><strong>Buffered lists:</strong> when the same POC Id list feeds many invocations, materialize once and use <code>Table.Buffer</code> on the Id table where profiling shows repeated evaluation cost.</p>
+
+  <h2><span class="sec-num">4</span><span id="s4">Validation rules (PQ + model)</span></h2>
+  <h3>In Power Query</h3>
+  <ul>
+    <li>Build a dedicated <strong>Validation / Exceptions</strong> query: invalid Ids, blank keys, duplicate POC rows, SOQL rows with missing required fields.</li>
+    <li>Use <strong>Column quality</strong> and <strong>Column distribution</strong> in Power BI to confirm expected distinct counts before closing the editor.</li>
+    <li>Assert <strong>referential intent</strong>: left anti join POC vs child aggregate to produce orphan candidates (should match DAX definition later).</li>
+  </ul>
+  <h3>In the model (DAX validation tables)</h3>
+  <ul>
+    <li>Hidden table <code>_Metrics_Check</code> with measures: total rows per fact, distinct POC count, distinct join keys in bridge tables.</li>
+    <li>Card visuals on a hidden “Diagnostics” page for authors only—surface refresh duration and error row count.</li>
+    <li>Cross-check: sum of child rows by object should never be negative; match-rate never above 100% unless definition explicitly allows “multi-match.”</li>
+  </ul>
+
+  <h2><span class="sec-num">5</span><span id="s5">Relationships: Import vs DirectQuery</span></h2>
+  <table>
+    <thead><tr><th>Topic</th><th>Import (recommended default)</th><th>DirectQuery</th></tr></thead>
+    <tbody>
+      <tr><td>Relationship flexibility</td><td>Full; many-to-many with bridge tables supported cleanly.</td><td>Stricter; some DAX patterns restricted or slower.</td></tr>
+      <tr><td>Transformations</td><td>Rich PQ; computed columns in model.</td><td>Prefer transformations pushed to source; limited PQ in composite models.</td></tr>
+      <tr><td>Validation</td><td>Refresh-time checks in PQ.</td><td>Every visual interaction can hit source—must guard SOQL/SQL cost.</td></tr>
+      <tr><td>“Updating a column”</td><td>Edit PQ; refresh dataset.</td><td>Often requires source view change or calculated table in Import partition of composite model.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <strong>Composite model caution:</strong> mixing Import and DirectQuery on related tables requires expert modeling to avoid ambiguous paths and excessive DQ queries. For the POC program, prefer a single well-partitioned Import unless latency mandates otherwise.
+  </div>
+  <h3>Relationship checklist</h3>
+  <ul>
+    <li>One active relationship path between any two dimensions and a fact; know why inactive relationships exist and which USERELATIONSHIP measures use them.</li>
+    <li>Avoid bi-directional filters unless necessary; they can introduce circular ambiguity and slow <code>SUMMARIZECOLUMNS</code>.</li>
+    <li>Cardinality: many-to-one from fact to dimension; never “fix” wrong totals by flipping to many-to-many without a bridge.</li>
+  </ul>
+
+  <h2><span class="sec-num">6</span><span id="s6">Advanced FN patterns (orchestrated M)</span></h2>
+  <p>Align implementation with <a href="salesforce-multi-object-fn-guide.html">Multi-object Salesforce FN guide</a> and numbered patterns in <a href="../queries-job-aide.html">queries-job-aide.html</a> (Task 2 bands).</p>
+  <ul>
+    <li><strong>Single SOQL runner function (FN):</strong> one <code>(query as text) as table</code> entry point handling headers, token injection, and <code>try ... otherwise</code> returning metadata columns <code>IsError</code>, <code>ErrorReason</code>, <code>BatchIndex</code>.</li>
+    <li><strong>Registry-driven loop:</strong> table of objects, anchor field, optional WHERE clause template—invoke FN per row with <code>Table.AddColumn</code> + <code>Table.ExpandTableColumn</code> or <code>List.Generate</code> for controlled concurrency.</li>
+    <li><strong>Error isolation:</strong> one failing object must not null the entire evaluation; union good tables and append error rows to a diagnostic query.</li>
+    <li><strong>Pagination:</strong> wrap <code>nextRecordsUrl</code> in the FN or a sibling function; cap max iterations with a parameter to avoid infinite loops.</li>
+    <li><strong>Rate limits:</strong> backoff on HTTP 429; optional <code>Function.InvokeAfter</code> spacing between calls when throttled.</li>
+  </ul>
+
+  <h2><span class="sec-num">7</span><span id="s7">DAX — measures, safety, performance</span></h2>
+  <ul>
+    <li><strong>Prefer measures over calculated columns</strong> unless the column is a physical slice needed for relationships or sort-by.</li>
+    <li><strong>Variables</strong> at the top of complex measures: improves readability and avoids multiple scans of the same table expression.</li>
+    <li><strong>Iterator discipline:</strong> <code>SUMX</code> over large fact tables is expensive; aggregate first with <code>SUMMARIZE</code> or use relationship-based <code>SUM</code> where possible.</li>
+    <li><strong>Divide safely:</strong> use <code>DIVIDE</code> for match rates to avoid divide-by-blank.</li>
+    <li><strong>Context transition:</strong> know when <code>CALCULATE</code> adds filters; test with <code>COUNTROWS</code> on a debug measure in a table visual.</li>
+    <li><strong>Time intelligence:</strong> requires a contiguous date table marked as date table; never use <code>FACT[date]</code> directly for TOTALYTD without verifying gaps.</li>
+  </ul>
+  <pre><code>POC Count :=
+DISTINCTCOUNT ( POC_Master[SID] )
+
+-- Counts POC keys that have at least one child row (adjust Child[AccountId] if different)
+Matched POCs :=
+SUMX (
+    VALUES ( POC_Master[SID] ),
+    VAR CurrentKey = POC_Master[SID]
+    RETURN
+        IF ( CALCULATE ( COUNTROWS ( Child ), Child[AccountId] = CurrentKey ) &gt; 0, 1, 0 )
+)
+
+Match Rate :=
+DIVIDE ( [Matched POCs], [POC Count] )</code></pre>
+  <p>Adjust table names to your model. Align this logic with your Power Query orphan anti-join for zero surprises.</p>
+  <h3>Row-level security (RLS)</h3>
+  <ul>
+    <li>Author roles on a <strong>security table</strong> (username → LOB / region) with static data or limited refresh; avoid expensive dynamic RLS that evaluates per row unless required.</li>
+    <li>After any role change, run <strong>View as</strong> with representative users and compare measure totals to an unfiltered baseline.</li>
+    <li>Document that match-rate and orphan measures are evaluated <em>after</em> RLS filters—executives see the slice they are allowed to see, not global org numbers, unless you explicitly use REMOVEFILTERS in a governed measure.</li>
+  </ul>
+
+  <h2><span class="sec-num">8</span><span id="s8">Conditional formatting &amp; visual QA</span></h2>
+  <h3>Matrix / table visuals</h3>
+  <ul>
+    <li>Use <strong>Rules</strong> on match-rate columns: 0–50% red, 50–85% amber, 85–100% green (tune to org expectations).</li>
+    <li>Apply <strong>data bars</strong> on numeric intensity columns (child counts) with axis max set to p95 to avoid outlier washout.</li>
+    <li>Turn on <strong>Alt text</strong> for key visuals for accessibility and audit screenshots.</li>
+    <li>Icon sets: limit to three states; redundant icons plus color harms clarity in executive views.</li>
+  </ul>
+  <h3>Management-ready polish</h3>
+  <ul>
+    <li>One KPI definition per card; subtitle shows period and filter scope.</li>
+    <li>Synchronize slicers across pages for demo flow.</li>
+    <li>Use default bookmark for “clean” opening state.</li>
+  </ul>
+
+  <h2><span class="sec-num">9</span><span id="s9">“Updating columns” &amp; native query boundaries</span></h2>
+  <ul>
+    <li><strong>Import:</strong> add or rename columns in Power Query, then refresh; avoid renaming columns in the model after reports reference them.</li>
+    <li><strong>DirectQuery:</strong> prefer changing a database view or adding a computed column in the warehouse; PQ “added column” may not fold—test in Performance Analyzer.</li>
+    <li><strong>Native SQL / SOQL in connector:</strong> document every hand-authored query in source control; parameterize dates and Id lists; never concatenate unsanitized user text into SOQL (injection and broken queries).</li>
+    <li><strong>Schema drift:</strong> when a source removes a column, PQ refresh fails loudly—good. Add defensive <code>Table.SelectColumns</code> with <code>MissingField.Ignore</code> only when business agrees to soft-drop.</li>
+  </ul>
+
+  <h2><span class="sec-num">10</span><span id="s10">Optimizing Power BI (full pass)</span></h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>Model size (VertiPaq)</h4>
+      <ul>
+        <li>Remove high-cardinality text not shown in reports.</li>
+        <li>Split datetime into date-only column when time-of-day unused.</li>
+        <li>Round currency to business precision in PQ if sub-cent noise is useless.</li>
+        <li>Use integers for keys where possible.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Refresh &amp; gateway</h4>
+      <ul>
+        <li>Parallelize only where gateway CPU and source limits allow.</li>
+        <li>Stagger large queries; sequence token retrieval before fan-out.</li>
+        <li>Incremental refresh on large facts when licensed and history rules are clear.</li>
+      </ul>
+    </div>
+  </div>
+  <ul>
+    <li><strong>Performance Analyzer (Desktop):</strong> capture DAX query ms vs visual display; fix top 3 slow visuals first.</li>
+    <li><strong>Aggregations:</strong> consider for large DirectQuery facts against imported summary tables—only with clear matching on granularity.</li>
+    <li><strong>RLS:</strong> test with <strong>View as</strong> roles; RLS can change join paths—retest match-rate measures per role.</li>
+  </ul>
+  <h3>Dataset settings (service) worth reviewing</h3>
+  <ul>
+    <li><strong>Scheduled refresh</strong> window vs upstream Salesforce maintenance; failure notifications to owners and delegates.</li>
+    <li><strong>Query timeout</strong> and <strong>parallel loading</strong> (when available)—tune after observing gateway CPU and source throttling.</li>
+    <li><strong>Enhanced metadata format</strong> and <strong>Large dataset storage format</strong> when models exceed default size thresholds (tenant dependent).</li>
+    <li><strong>Deployment pipelines</strong> test stage: run the same zero-defect checklist before production promotion.</li>
+  </ul>
+  <h3>Incremental refresh (when licensed)</h3>
+  <ul>
+    <li>Define <strong>RangeStart / RangeEnd</strong> parameters and filter facts in PQ; archive cold history only if business agrees.</li>
+    <li>First refresh after policy change can be long—communicate before management demos.</li>
+    <li>Detect deleted rows policy: “real” deletes in source may not flow unless modeled (e.g., tombstone column).</li>
+  </ul>
+
+  <h2><span class="sec-num">11</span><span id="s11">Zero-defect gates &amp; audit trail</span></h2>
+  <div class="chk">
+    <h3>Pre-publish gate (all must pass)</h3>
+    <ul>
+      <li>No unresolved errors in Power Query; Exceptions query is empty or explicitly signed off.</li>
+      <li>POC Master: distinct SID count matches stewardship expectation within documented tolerance.</li>
+      <li>Full refresh completes in SLA; diagnostic table shows no 401/403 unless expected in dev.</li>
+      <li>Match rate and orphan definitions match between PQ validation, DAX measures, and footnotes on the report page.</li>
+      <li>Sensitivity labels and workspace permissions aligned to data classification.</li>
+      <li>Version note captured: dataset name, publish date, and change summary for auditors.</li>
+    </ul>
+  </div>
+  <h3>After findings (post-release discipline)</h3>
+  <ul>
+    <li>Log every production defect with root cause class: Id hygiene, relationship, DAX context, SOQL batching, gateway credential, or training.</li>
+    <li>Feed recurring defects back into this checklist—treat the checklist as a living control.</li>
+  </ul>
+  <table>
+    <thead><tr><th>Finding symptom</th><th>First place to inspect</th><th>Preventive control</th></tr></thead>
+    <tbody>
+      <tr><td>Match rate jumps after refresh</td><td>Duplicate POC rows; relationship active/inactive swap</td><td>PQ distinct on SID; relationship diagram review</td></tr>
+      <tr><td>Orphans disagree with SOQL Workbench</td><td>Id case; 15 vs 18; wrong anchor field (<code>WhatId</code> vs <code>AccountId</code>)</td><td>Single normalization function; object-specific FN template</td></tr>
+      <tr><td>401 / 403 on schedule only</td><td>Gateway credential; expired secret; IP allowlist</td><td>Service principal or key rotation calendar</td></tr>
+      <tr><td>Visual blank but no error</td><td>RLS over-filter; bi-di ambiguity</td><td>View as matrix; disable bi-di unless required</td></tr>
+      <tr><td>Refresh slower week over week</td><td>New wide REST columns; lost PQ filter</td><td>Column audit diff; restore selective SOQL</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:24px;font-size:13px;"><strong>Related pack:</strong> <a href="../enhancements.html">Enhancements catalog</a> · <a href="bfc-doc-p2.html">bfc-doc-p2</a> · <a href="brand-guidelines-power-bi-td-child-match.html">Brand guidelines</a> · <a href="../queries-job-aide.html">M query library (Advanced M · DAX · Settings tab)</a></p>
+</main>
+<footer>
+  <p>bfc-best-va · Blackflow Cloud · TD Banking Intelligence Suite</p>
+</footer>
+</body>
+</html>

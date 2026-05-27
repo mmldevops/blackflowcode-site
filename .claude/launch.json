@@ -1,0 +1,36 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hedra-music-video",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/AdminPortal/Desktop/Blackflowcloud/Self-hosted/hedra-music-video", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "hedra-trigger-worker",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["trigger.dev@latest", "dev", "--config", "/Users/AdminPortal/Desktop/Blackflowcloud/Self-hosted/hedra-music-video/trigger.config.ts"],
+      "port": 3040
+    },
+    {
+      "name": "toolbank",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/AdminPortal/Desktop/Blackflowcloud/Self-hosted/Toolbank", "start"],
+      "port": 3001
+    },
+    {
+      "name": "teable-mcp-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/AdminPortal/Desktop/Blackflowcloud/Self-hosted/claudd-code-edu/teable-mcp-server", "run", "dev"],
+      "port": 3002
+    },
+    {
+      "name": "bfc-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/AdminPortal/Desktop/Blackflowcloud/Self-hosted/claudd-code-edu/bfc-dashboard", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}

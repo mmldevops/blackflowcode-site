@@ -1,0 +1,28 @@
+{
+  "name": "Blackflow Cloud / TD Banking — Power BI",
+  "colors": {
+    "brandRed": "#ED1D24",
+    "brandDark": "#1A1A2E",
+    "brandBlue": "#0066CC",
+    "pageBackground": "#F4F5F7",
+    "surface": "#FFFFFF",
+    "border": "#E0E4EC",
+    "textPrimary": "#2C2C3E",
+    "textMuted": "#6B7280",
+    "success": "#10B981",
+    "warning": "#F59E0B",
+    "accentPurple": "#7C3AED"
+  },
+  "typography": {
+    "fontFamily": "'Segoe UI', system-ui, -apple-system, sans-serif",
+    "titleReport": "20pt semibold",
+    "pageTitle": "14pt bold",
+    "body": "10–11pt",
+    "dataLabels": "9pt"
+  },
+  "layout": {
+    "canvasMaxWidthPx": 1440,
+    "gridMarginPx": 16,
+    "kpiMinHeightPx": 72
+  }
+}

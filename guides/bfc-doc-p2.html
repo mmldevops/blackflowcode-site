@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bfc-doc-p2 — Phase 2 · Task 2 vertical slice</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;--shadow:0 2px 12px rgba(0,0,0,.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px;}
+nav{background:var(--white);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:12px;position:sticky;top:0;z-index:30;}
+nav .nh{color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:10px;}
+nav a{color:var(--blue);font-weight:600;text-decoration:none;}
+nav a:hover{text-decoration:underline;}
+header{background:var(--dark);color:#fff;padding:16px 24px;border-bottom:3px solid var(--red);}
+header h1{font-size:16px;font-weight:800;}
+header p{font-size:12px;color:#94A3B8;margin-top:8px;max-width:760px;}
+.badge{display:inline-block;background:#1D4ED8;color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:14px;margin-top:10px;letter-spacing:.04em;}
+main{max-width:980px;margin:0 auto;padding:26px 22px 56px;}
+h2{font-size:17px;color:var(--dark);margin:28px 0 10px;padding-bottom:8px;border-bottom:2px solid var(--border);}
+h2:first-of-type{margin-top:0;}
+h3{font-size:14px;color:var(--dark);margin:18px 0 8px;}
+p,li{color:var(--muted);margin:8px 0;font-size:13px;}
+ul{padding-left:20px;}
+code{font-family:'Cascadia Code','Consolas',monospace;font-size:12px;background:rgba(0,102,204,.08);padding:1px 6px;border-radius:4px;}
+.callout{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:10px;padding:14px 16px;margin:14px 0;box-shadow:var(--shadow);}
+.callout strong{color:var(--dark);}
+.grid2{display:grid;gap:14px;margin-top:12px;}
+@media(min-width:760px){.grid2{grid-template-columns:1fr 1fr;}}
+.card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow);}
+.card h4{font-size:13px;font-weight:800;color:var(--dark);margin-bottom:8px;}
+.card ul{margin:0;padding-left:18px;}
+.card li{margin:5px 0;}
+table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:12px 0;font-size:12px;box-shadow:var(--shadow);}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+th{background:var(--dark);color:#fff;font-weight:600;}
+tr:last-child td{border-bottom:none;}
+.dod{background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:14px 16px;margin:14px 0;}
+.dod h3{margin-top:0;color:#065F46;}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;}
+.links a{display:inline-block;padding:6px 12px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:var(--blue);text-decoration:none;}
+.links a:hover{border-color:var(--blue);}
+footer{text-align:center;padding:20px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:36px;}
+footer a{color:var(--blue);font-weight:600;}
+</style>
+</head>
+<body>
+<nav aria-label="Related guides">
+  <span class="nh">Navigate</span>
+  <a href="../job-aide-hub.html">Hub</a>
+  <a href="enhancements-playbook.html">Enhancements playbook</a>
+  <a href="../enhancements.html">Enhancements catalog</a>
+  <a href="task2-child-records-match-job-aide.html">Task 2 job aide</a>
+  <a href="salesforce-multi-object-fn-guide.html">Multi-object FN</a>
+  <a href="../queries-job-aide.html">M query library</a>
+</nav>
+<header>
+  <h1>bfc-doc-p2 — Phase 2 · Task 2 vertical slice</h1>
+  <p>This guide expands <strong>Phase B</strong> in the enhancements playbook: one end-to-end slice of the POC Child Records Match so refresh, KPIs, and steward-facing exports are real before Task 1 polish. If you count phases numerically: <strong>A = 1</strong> (freeze scope), <strong>B = 2</strong> (this guide — Task 2 only), <strong>C = 3</strong> (Task 1 slice), <strong>D = 4</strong> (rehearsal). This is independent of document ids such as <code>bfc-doc-j1</code> (Task 1 job aide).</p>
+  <span class="badge">Task 2 · Mid-review May 26, 2026</span>
+</header>
+<main>
+
+  <div class="callout">
+    <strong>What “done” looks like for Phase 2.</strong> A scheduled (or manual) refresh completes; the model exposes POC count, per-object match rates, overall match rate, orphan count, and refresh status on one executive summary page; stewards can export an orphan table filtered to POC accounts with zero related rows across in-scope objects.
+  </div>
+
+  <h2>1. Entry criteria (complete Phase A first)</h2>
+  <ul>
+    <li><strong>POC Master</strong> locked to logical columns <code>SID</code> and <code>POC_Record_Name</code>; template available from the hub downloads.</li>
+    <li>In-scope <strong>child objects</strong> confirmed in your org (API names match the catalog in <code>enhancements.html</code>).</li>
+    <li>Gateway or dataset credentials chosen for Salesforce; <strong>no secrets in M</strong> text.</li>
+    <li>Three critical Task 2 enhancements from the catalog selected (for example: ID normalization, SOQL batching, match scorecard).</li>
+  </ul>
+
+  <h2>2. Workstreams (suggested order)</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>A · Token and REST shell</h4>
+      <ul>
+        <li>Single cached OAuth or certificate path; reuse token across queries.</li>
+        <li>Helper function or shared query for instance URL + API version.</li>
+        <li>Central <code>try / otherwise</code> pattern so one object failure does not blank the model (see multi-object FN guide).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>B · POC Id set</h4>
+      <ul>
+        <li>Load POC Master; trim, uppercase, validate length 15 or 18; dedupe <code>SID</code>.</li>
+        <li>Materialize <code>POC_AccountIds</code> as the only driver for child SOQL filters.</li>
+        <li>Merge <code>POC_Record_Name</code> back onto child results for slicers and titles.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>C · Child pulls</h4>
+      <ul>
+        <li>SOQL <code>IN</code> batches (~200 Ids per request); union partitions.</li>
+        <li>Pagination on at least one heavy object (<code>nextRecordsUrl</code> loop).</li>
+        <li>Optional: registry table driving object list for the orchestrator pattern.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>D · Measures and orphan logic</h4>
+      <ul>
+        <li>Per-object match rate: POCs with ≥1 related row ÷ POC count (define consistently).</li>
+        <li>Orphans: POC <code>SID</code> with no matches across the in-scope union (document the rule).</li>
+        <li>Refresh status measure or card bound to last refresh error table if you log errors.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>E · Report shell</h4>
+      <ul>
+        <li>One <strong>Executive summary</strong> page: POC count, objects loaded, overall match rate, orphan count, refresh status.</li>
+        <li>Second page optional: per-object matrix or small multiples if time allows.</li>
+        <li>Apply brand tokens from the brand guidelines guide for colors and KPI layout.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>F · Steward handoff</h4>
+      <ul>
+        <li>Table visual: POC name, SID, object columns or “no coverage” flag; enable export.</li>
+        <li>Document the orphan definition in the report tooltip or a one-line text box.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>3. M query ranges (quick pointer)</h2>
+  <p>Use <a href="../queries-job-aide.html"><code>queries-job-aide.html</code></a> on the Task 2 tab. Prioritize bands called out in the Task 2 job aide: <strong>201–240</strong> (auth and REST), <strong>241–280</strong> (chunking and POC load — align to <code>SID</code>), <strong>281–340</strong> (child pulls), <strong>341–400</strong> (deltas and quality). Use the <strong>Advanced M · DAX · Settings</strong> tab for Desktop stability if refresh is flaky.</p>
+
+  <h2>4. Decision checkpoints</h2>
+  <table>
+    <thead>
+      <tr><th>Signal</th><th>If failing</th><th>Before adding scope</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Refresh timeout</td>
+        <td>Narrow SELECT lists, add pagination everywhere heavy, split staging tables</td>
+        <td>Do not add new objects until one full refresh succeeds</td>
+      </tr>
+      <tr>
+        <td>Match rate &gt; 100% or null</td>
+        <td>Fix relationship cardinality and filter direction; confirm POC grain</td>
+        <td>Freeze measures before new visuals</td>
+      </tr>
+      <tr>
+        <td>Orphan list empty but known gaps exist</td>
+        <td>Verify SOQL filters use the same Id set as POC Master; check case and 15/18 char joins</td>
+        <td>Re-run Gate 1 on data (playbook) before UI work</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="dod">
+    <h3>Phase 2 exit checklist</h3>
+    <ul>
+      <li>Full refresh completes within workspace limits (or documented manual refresh path).</li>
+      <li>Executive summary shows the five headline metrics with correct definitions.</li>
+      <li>At least one child object uses pagination or batching in production-like volume.</li>
+      <li>Exportable orphan table with <code>POC_Record_Name</code> and <code>SID</code>.</li>
+      <li>Short build note captured (what shipped, what is deferred to Phase C).</li>
+    </ul>
+  </div>
+
+  <h2>5. What comes next (Phase C)</h2>
+  <p>After this slice is stable, move to Task 1 (playbook Phase C): RLS smoke tests, one permission or drift visual, and optional mobile layout. Keep Task 2 refresh on a schedule so regressions show up early.</p>
+
+  <h2>6. Related documents</h2>
+  <div class="links">
+    <a href="enhancements-playbook.html">Enhancements playbook</a>
+    <a href="task2-child-records-match-job-aide.html">Task 2 job aide</a>
+    <a href="salesforce-multi-object-fn-guide.html">Multi-object FN guide</a>
+    <a href="bfc-best-va.html">bfc-best-va</a>
+    <a href="../enhancements.html">Enhancements catalog</a>
+    <a href="../task2-dashboard.html">Task 2 HTML mockup</a>
+  </div>
+</main>
+<footer>
+  <p>Blackflow Cloud · TD Banking · <a href="enhancements-playbook.html">Playbook</a> · bfc-doc-p2</p>
+</footer>
+</body>
+</html>

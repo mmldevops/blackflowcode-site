@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Aide Hub — TD Banking Intelligence Suite</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;}
+header{background:var(--dark);color:#fff;padding:16px 24px;border-bottom:3px solid var(--red);display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+header .mark{width:32px;height:32px;background:var(--red);border-radius:6px;display:grid;place-items:center;font-weight:900;}
+header h1{font-size:15px;font-weight:700;}
+header p{font-size:12px;color:#94A3B8;flex:1;min-width:200px;}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px;}
+h2{font-size:18px;color:var(--dark);margin:28px 0 12px;}
+p.lead{font-size:14px;color:var(--muted);margin-bottom:16px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+a.card{display:block;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:18px;text-decoration:none;color:inherit;transition:border-color .15s;}
+a.card:hover{border-color:var(--blue);}
+a.card h3{font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px;}
+a.card span.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:#FEE2E2;color:#B91C1C;margin-bottom:8px;}
+a.card span.tag.t2{background:#DBEAFE;color:#1D4ED8;}
+a.card span.tag.t1{background:#DCFCE7;color:#166534;}
+a.card p{font-size:12px;color:var(--muted);}
+.section-dl{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:24px;}
+.section-dl h3{font-size:15px;margin-bottom:4px;}
+.section-dl>p.sub{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.asset-tabrow{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--border);margin:14px 0 0;}
+.asset-tab{padding:10px 14px;font-size:12px;font-weight:600;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;border-radius:6px 6px 0 0;}
+.asset-tab:hover{color:var(--text);background:var(--bg);}
+.asset-tab.active{color:var(--red);border-bottom-color:var(--red);background:var(--bg);}
+.asset-pane{display:none;padding:14px 4px 4px;}
+.asset-pane.active{display:block;}
+.asset-pane p{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;}
+.asset-pane .fname{font-size:11px;font-weight:700;color:var(--dark);font-family:'Cascadia Code','Consolas',monospace;margin-bottom:8px;}
+button.dl{background:var(--dark);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;}
+button.dl:hover{background:#2d2d4e;}
+button.dl.sec{background:var(--white);color:var(--dark);border:1px solid var(--border);}
+button.dl.sec:hover{border-color:var(--blue);color:var(--blue);}
+footer{text-align:center;padding:24px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:40px;}
+footer strong{color:var(--red);}
+</style>
+</head>
+<body>
+<header>
+  <div class="mark">M</div>
+  <div>
+    <h1>Blackflow Cloud — Job Aide Hub</h1>
+    <p>TD Banking Intelligence Suite · Mid-review pack · Task 2 prioritized</p>
+  </div>
+</header>
+<div class="wrap">
+  <p class="lead">Start with <strong>Recommended Enhancements</strong>, then open the <strong>Task 2</strong> job aide for the POC Child Records Match build. Use <strong>Brand Guidelines</strong> when applying the shared Power BI theme. Downloadable templates work from this page even when opened as a local file.</p>
+
+  <h2>Guides and mockups</h2>
+  <div class="grid">
+    <a class="card" href="enhancements.html">
+      <span class="tag">Start here</span>
+      <h3>Recommended enhancements (Task 2 first)</h3>
+      <p>Pre-build backlog for both tasks, POC Master schema notes, child-object matrix, connection patterns.</p>
+    </a>
+    <a class="card" href="guides/enhancements-playbook.html">
+      <span class="tag">Companion</span>
+      <h3>Enhancements playbook</h3>
+      <p>Phased plan, outcome map by audience, decision gates, and mid-review evidence checklist — pairs with the full enhancement catalog.</p>
+    </a>
+    <a class="card" href="guides/bfc-best-va.html">
+      <span class="tag">Best practices</span>
+      <h3>bfc-best-va — Validation &amp; Power BI excellence</h3>
+      <p>Salesforce Id hygiene, spreadsheets, Power Query, relationships, DirectQuery, FN/M, DAX, conditional formatting, optimization, zero-defect gates.</p>
+    </a>
+    <a class="card" href="guides/brand-guidelines-power-bi-td-child-match.html">
+      <span class="tag t1">Brand / UX</span>
+      <h3>Power BI brand and UI guidelines</h3>
+      <p>Colors, typography, layout grids, chart semantics, accessibility, print and mobile.</p>
+    </a>
+    <a class="card" href="guides/task2-child-records-match-job-aide.html">
+      <span class="tag t2">Task 2</span>
+      <h3>Child Records Match — end-to-end job aide</h3>
+      <p>Data model, report pages, SOQL patterns, links to M query library and HTML mockup.</p>
+    </a>
+    <a class="card" href="guides/bfc-doc-p2.html">
+      <span class="tag t2">Phase 2</span>
+      <h3>bfc-doc-p2 — Task 2 vertical slice</h3>
+      <p>Playbook Phase B in depth: entry criteria, workstreams, M ranges, checkpoints, exit checklist before Task 1 slice.</p>
+    </a>
+    <a class="card" href="guides/bfc-doc-j1.html">
+      <span class="tag t1">Task 1</span>
+      <h3>bfc-doc-j1 — User dashboard job aide</h3>
+      <p>Page map, CSV ingest, RLS checklist, link to interactive mockup.</p>
+    </a>
+    <a class="card" href="queries-job-aide.html">
+      <span class="tag">Library</span>
+      <h3>500 Power Query (M) patterns</h3>
+      <p>Searchable catalog: Task 1 (1–200), Task 2 (201–400), general utilities (401–500).</p>
+    </a>
+    <a class="card" href="guides/salesforce-multi-object-fn-guide.html">
+      <span class="tag t2">FN</span>
+      <h3>Multi-object Salesforce M function guide</h3>
+      <p>Registry table, SF_RunSoql function, orchestrator loop, and per-object error isolation.</p>
+    </a>
+    <a class="card" href="task2-dashboard.html">
+      <span class="tag t2">Mockup</span>
+      <h3>Task 2 dashboard HTML mockup</h3>
+      <p>Wire-level reference for KPIs, object grid, and tables.</p>
+    </a>
+    <a class="card" href="task1-dashboard.html">
+      <span class="tag t1">Mockup</span>
+      <h3>Task 1 dashboard HTML mockup</h3>
+      <p>Wire-level reference for LOB filters and user analytics pages.</p>
+    </a>
+  </div>
+
+  <div class="section-dl" id="asset-dock">
+    <h3>Downloadable assets</h3>
+    <p class="sub">Pick a tab, then download. Files are generated in the browser (works with <code>file://</code>). Copies also live under <code>guides/assets/</code>.</p>
+    <div class="asset-tabrow" role="tablist" aria-label="Asset download categories">
+      <button type="button" class="asset-tab active" role="tab" aria-selected="true" data-tab="poc">POC template</button>
+      <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="child">Child catalog</button>
+      <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="brand">Brand tokens</button>
+      <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="check">Build checklist</button>
+    </div>
+    <div class="asset-panes">
+      <div class="asset-pane active" data-panel="poc" role="tabpanel">
+        <div class="fname">poc-master-template.csv</div>
+        <p>Starter columns <code>SID</code> and <code>POC_Record_Name</code> for <strong>[POC Master Records]</strong>. Replace sample Ids with real Salesforce Account Ids.</p>
+        <button type="button" class="dl" data-file="poc-master-template.csv">Download CSV</button>
+      </div>
+      <div class="asset-pane" data-panel="child" role="tabpanel">
+        <div class="fname">child-objects-catalog.csv</div>
+        <p>In-scope child objects with suggested API names, anchor field patterns, and a verify flag. Use when drafting SOQL and Power Query merges.</p>
+        <button type="button" class="dl" data-file="child-objects-catalog.csv">Download CSV</button>
+      </div>
+      <div class="asset-pane" data-panel="brand" role="tabpanel">
+        <div class="fname">brand-tokens.json</div>
+        <p>Machine-readable colors, typography, and layout hints for Power BI theme JSON or documentation.</p>
+        <button type="button" class="dl sec" data-file="brand-tokens.json">Download JSON</button>
+      </div>
+      <div class="asset-pane" data-panel="check" role="tabpanel">
+        <div class="fname">mid-review-build-checklist.txt</div>
+        <p>Task 2-first checklist for refresh, chunking, orphans, RLS, and shared governance items.</p>
+        <button type="button" class="dl sec" data-file="mid-review-build-checklist.txt">Download TXT</button>
+      </div>
+    </div>
+  </div>
+</div>
+<footer>
+  <p><strong>Blackflow Cloud</strong> · Local job aide pack · Align column names in Power Query with your real <code>[POC Master Records]</code> workbook.</p>
+</footer>
+<script>
+(function(){
+  const childCsv = `object_label,suggested_api_name,anchor_field,pattern_notes,verify_in_org
+Account,Account,Id,POC SID joins to Account.Id; use for labels and hierarchy,true
+Account Campaign Association,Account_Campaign_Association__c,Account__c_or_AccountId,Confirm actual relationship field name in Object Manager,true
+AccountContactRole,AccountContactRole,AccountId,Standard junction to Contact,true
+AccountFeed,AccountFeed,ParentId,Chatter feed for Account; high volume — consider date filter,true
+AccountHistory,AccountHistory,AccountId,Field history; can be large — filter by date if allowed,true
+AccountShare,AccountShare,AccountId,Sharing rows; usually admin-only visibility in reports — confirm REST access,false
+AccountTeamMember,AccountTeamMember,AccountId,Team members tied to Account,true
+Address,Address__c,Parent_Account_or_Account__c,Confirm lookup API name on custom object,true
+Borrower Risk Rating,Borrower_Risk_Rating__c,Account__c,Confirm lookup API name,true
+Contact,Contact,AccountId,Primary child for most POCs,true
+Covid Customer Relief Tracker,Covid_Customer_Relief_Tracker__c,Account__c,Confirm lookup API name,true
+Credit Memo Narrative,Credit_Memo_Narrative__c,Account__c,Confirm lookup API name,true
+Event,Event,WhatId_or_AccountId,Often WhatId = Account Id; some orgs expose AccountId — validate,true
+FeedItem,FeedItem,ParentId,Polymorphic parent; filter Parent.Type = 'Account' and ParentId IN POC set,true
+Field History,Field_History__c,Account__c,Confirm lookup API name,true
+Lead,Lead,ConvertedAccountId_or_none,Not a strict Account child until converted; optional for POC match — use ConvertedAccountId if available,false
+LLC BI Account Collateral,LLC_BI__Account_Collateral__c,LLC_BI__Account__c_or_Account__c,nCino-style package; confirm package namespace and lookup,true
+LLC BI Account Covenant,LLC_BI__Account_Covenant__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Account Document,LLC_BI__AccountDocument__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Connection,LLC_BI__Connection__c,From_Account__c_To_Account__c,May link two accounts — decide which side matches POC SID,true
+LLC BI Covenant2,LLC_BI__Covenant2__c,Account_or_Loan_lookup,Confirm parent object for covenant row,true
+LLC BI Loan,LLC_BI__Loan__c,LLC_BI__Account__c,Loan tied to borrowing entity; confirm field name,true
+Loan Application,Loan_Application__c,Account__c,Confirm lookup API name,true
+Loan Clone,Loan_Clone__c,Account__c,Confirm lookup API name,true
+Note,Note,ParentId,Polymorphic — filter ParentId IN POC Account Ids and IsDeleted=false,true
+Opportunity,Opportunity,AccountId,Standard child of Account,true
+PLNDR RA PL Relationship Details,PLNDR_RA_PL_Relationship_Details__c,Account__c,Spelling may differ (Details vs Detalls) — verify,true
+Relationship Planning,Relationship_Planning__c,Account__c,Confirm lookup API name,true
+Requests,Requests__c,Account__c,Confirm lookup API name,true
+Task,Task,WhatId_or_AccountId,Same pattern as Event — validate which field your org populates for Account-linked tasks,true
+TM CDD Onboarding,TM_CDD_Onboarding__c,Account__c,Confirm lookup API name,true
+`;
+  const brandJson = JSON.stringify({
+    name: "Blackflow Cloud / TD Banking — Power BI",
+    colors: {
+      brandRed: "#ED1D24",
+      brandDark: "#1A1A2E",
+      brandBlue: "#0066CC",
+      pageBackground: "#F4F5F7",
+      surface: "#FFFFFF",
+      border: "#E0E4EC",
+      textPrimary: "#2C2C3E",
+      textMuted: "#6B7280",
+      success: "#10B981",
+      warning: "#F59E0B",
+      accentPurple: "#7C3AED"
+    },
+    typography: {
+      fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+      titleReport: "20pt semibold",
+      pageTitle: "14pt bold",
+      body: "10–11pt",
+      dataLabels: "9pt"
+    },
+    layout: { canvasMaxWidthPx: 1440, gridMarginPx: 16, kpiMinHeightPx: 72 }
+  }, null, 2);
+  const checklist = `Mid-review build checklist — TD Banking Intelligence Suite
+Date target: May 26, 2026
+
+Task 2 — POC Child Records Match (build first)
+[ ] POC Master spreadsheet uses columns SID and POC_Record_Name (or mapped in Power Query)
+[ ] All Account Ids normalized: trim, upper, validate length 15 or 18
+[ ] OAuth token in a single cached query (gateway credentials for secrets)
+[ ] SOQL IN batches capped at ~200 Ids per request; union results
+[ ] Pagination implemented for objects returning >2000 rows
+[ ] Match-rate KPI per in-scope child object
+[ ] Orphan page: POC accounts with zero related rows across objects
+[ ] Refresh failure UX: try/otherwise with logged error table
+
+Task 1 — User dashboard
+[ ] RLS roles tested per LOB (SBB, SBCAT, Treasury, CIE LOD)
+[ ] Report CSVs versioned or "latest file" pattern documented
+[ ] Executive summary page + phone layout smoke test
+
+Shared
+[ ] Theme JSON applied from brand tokens; semantic colors for good/warn/bad
+[ ] No secrets in M code; gateway or dataset credentials only
+`;
+  const pocCsv = `SID,POC_Record_Name
+001000000000000AAA,Replace with your POC label
+001000000000001AAA,Second example row
+`;
+  const map = {
+    'poc-master-template.csv': pocCsv,
+    'child-objects-catalog.csv': childCsv,
+    'brand-tokens.json': brandJson,
+    'mid-review-build-checklist.txt': checklist
+  };
+  function dl(name, body, mime) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: mime || 'text/plain;charset=utf-8' }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  var dock = document.getElementById('asset-dock');
+  if (dock) {
+    dock.addEventListener('click', function (e) {
+      var tab = e.target.closest('.asset-tab');
+      if (tab && dock.contains(tab)) {
+        var id = tab.getAttribute('data-tab');
+        dock.querySelectorAll('.asset-tab').forEach(function (t) {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+        });
+        dock.querySelectorAll('.asset-pane').forEach(function (p) {
+          p.classList.toggle('active', p.getAttribute('data-panel') === id);
+        });
+        return;
+      }
+      var btn = e.target.closest('button.dl[data-file]');
+      if (!btn || !dock.contains(btn)) return;
+      var k = btn.getAttribute('data-file');
+      var body = map[k];
+      if (!body) return;
+      var mime = k.endsWith('.json') ? 'application/json' : k.endsWith('.csv') ? 'text/csv' : 'text/plain';
+      dl(k, body, mime);
+    });
+  }
+})();
+</script>
+</body>
+</html>

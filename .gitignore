@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Build artifacts
+teable-mcp-server/dist/
+
+# Secrets — never commit
+.env.local
+.env.*.local
+*.env
+
+# Vercel
+.vercel/
+
+# Claude Code local settings (contains API keys)
+.claude/settings.local.json
+
+# Nested repos managed independently
+bfc-dashboard/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

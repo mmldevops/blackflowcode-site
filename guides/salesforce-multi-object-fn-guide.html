@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FN Guide — Multiple Salesforce Objects in Power Query</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px;}
+header{background:var(--dark);color:#fff;padding:14px 22px;border-bottom:3px solid var(--red);}
+header .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+header .mark{width:30px;height:30px;background:var(--red);border-radius:6px;display:grid;place-items:center;font-weight:900;}
+header h1{font-size:14px;font-weight:700;}
+header a{color:#93C5FD;font-size:12px;margin-left:auto;}
+main{max-width:960px;margin:0 auto;padding:24px 20px 48px;}
+h2{font-size:17px;color:var(--dark);margin:28px 0 10px;border-bottom:2px solid var(--border);padding-bottom:6px;}
+h3{font-size:14px;margin:16px 0 8px;color:var(--dark);}
+p,li{color:var(--muted);margin:8px 0;}
+ul{margin:8px 0 8px 20px;}
+code,.mono{font-family:'Cascadia Code','Consolas',monospace;font-size:12px;background:#E8EDF7;padding:2px 6px;border-radius:4px;}
+pre{background:#1E1E2E;color:#CDD6F4;padding:14px 16px;border-radius:8px;overflow-x:auto;font-size:11px;line-height:1.55;margin:12px 0;}
+.kw{color:#89DCEB;}.str{color:#A6E3A1;}.cm{color:#6C7086;}.fn{color:#CBA6F7;}
+.callout{border-left:4px solid var(--red);background:var(--white);padding:12px 16px;margin:14px 0;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);font-size:12px;margin:12px 0;}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);}
+th{background:var(--dark);color:#fff;}
+.links a{color:var(--blue);font-weight:600;text-decoration:none;font-size:13px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="mark">FN</div>
+    <h1>Multi-object Salesforce pull — M function pattern (Power Query)</h1>
+    <a href="../job-aide-hub.html">Hub</a>
+  </div>
+</header>
+<main>
+  <p class="links"><a href="../queries-job-aide.html">M query library (500)</a> · <a href="task2-child-records-match-job-aide.html">Task 2 job aide</a></p>
+
+  <div class="callout">
+    <strong>Goal:</strong> one orchestrator that loops many Salesforce objects (Contact, Opportunity, custom __c tables, etc.), runs SOQL per object, normalizes to a common shape, and unions or keeps separate tables — without duplicating OAuth and URL glue in every query.
+  </div>
+
+  <h2>1. Parameters you reuse everywhere</h2>
+  <ul>
+    <li><code>SF_Instance</code> — text, e.g. <code>https://myorg.my.salesforce.com</code></li>
+    <li><code>SF_ApiVersion</code> — text, e.g. <code>v59.0</code></li>
+    <li><code>SF_Token</code> — from a single cached query <code>SF_Auth</code> (never paste secrets into M text; use gateway credentials)</li>
+    <li><code>POC_AccountIds</code> — table of distinct Ids used to build batched <code>IN (...)</code> clauses</li>
+  </ul>
+
+  <h2>2. Object registry (table of what to pull)</h2>
+  <p>Author a query <code>SF_ObjectRegistry</code> as a static or Excel-driven table:</p>
+  <table>
+    <thead><tr><th>ObjectApiName</th><th>SelectFields</th><th>WhereTemplate</th><th>AnchorField</th></tr></thead>
+    <tbody>
+      <tr><td>Contact</td><td>Id, AccountId, LastName</td><td>AccountId IN ({IDS})</td><td>AccountId</td></tr>
+      <tr><td>Opportunity</td><td>Id, AccountId, Name, StageName</td><td>AccountId IN ({IDS})</td><td>AccountId</td></tr>
+      <tr><td>MyObject__c</td><td>Id, Loan_Account__c, Name</td><td>Loan_Account__c IN ({IDS})</td><td>Loan_Account__c</td></tr>
+    </tbody>
+  </table>
+  <p>Replace <code>{IDS}</code> at runtime with a quoted Id list from each chunk (same pattern as Task 2 queries 241–280).</p>
+
+  <h2>3. Core FN — one function per SOQL call</h2>
+  <p>Expose a reusable function query <code>SF_RunSoql</code> that accepts full SOQL text and returns a table (not just raw records list), so the orchestrator stays simple.</p>
+<pre><span class="kw">let</span>
+  <span class="fn">SF_RunSoql</span> = (soql <span class="kw">as</span> text) <span class="kw">as</span> table <span class="kw">=&gt;</span>
+    <span class="kw">let</span>
+      Auth = SF_Auth,
+      Url  = Auth[Instance] &amp; <span class="str">"/services/data/"</span> &amp; SF_ApiVersion &amp; <span class="str">"/query/?q="</span> &amp; Uri.EscapeDataString(soql),
+      Json = Json.Document(
+        Web.Contents(Url, [Headers=[Authorization=<span class="str">"Bearer "</span> &amp; Auth[Token]]])
+      ),
+      Recs = Json[records],
+      T    = Table.FromRecords(Recs)
+    <span class="kw">in</span> T
+<span class="kw">in</span> <span class="fn">SF_RunSoql</span></pre>
+
+  <h2>4. Orchestrator — loop registry rows</h2>
+  <p>For each object row, build SOQL, call <code>SF_RunSoql</code>, add constant columns <code>SourceObject</code> and optional <code>BatchId</code>, then <code>Table.Combine</code>. Chunk Ids with <code>List.Split</code> so each SOQL stays under length limits.</p>
+<pre><span class="cm">// Pseudocode shape — plug in your chunking list from POC_AccountIds</span>
+<span class="kw">let</span>
+  Chunks = <span class="cm">/* list of text: "'001...','002...'" */</span>,
+  Rows   = Table.ToRecords(SF_ObjectRegistry),
+  Tables = List.Transform(Rows, <span class="kw">each</span>
+    <span class="kw">let</span>
+      soql = <span class="str">"SELECT "</span> &amp; [SelectFields] &amp; <span class="str">" FROM "</span> &amp; [ObjectApiName] &amp; <span class="str">" WHERE "</span> &amp;
+             Text.Replace([WhereTemplate], <span class="str">"{IDS}"</span>, Chunks{0}),
+      T    = SF_RunSoql(soql),
+      T2   = Table.AddColumn(T, <span class="str">"SourceObject"</span>, <span class="kw">each</span> [ObjectApiName], type text)
+    <span class="kw">in</span> T2),
+  Out    = Table.Combine(Tables)
+<span class="kw">in</span> Out</pre>
+
+  <h2>5. Isolating failures (one bad object does not kill refresh)</h2>
+  <p>Wrap each call:</p>
+<pre>Result = <span class="kw">try</span> SF_RunSoql(soql) <span class="kw">otherwise</span> #table({<span class="str">"Error"</span>}, {{<span class="str">"SOQL failed"</span>}})</pre>
+  <p>Then filter or flag error rows in a diagnostics table for the report.</p>
+
+  <h2>6. Performance and crashes</h2>
+  <ul>
+    <li>Do <strong>not</strong> fire all objects in parallel inside one query unless you control concurrency — prefer sequential <code>List.Transform</code> or a small custom loop with a low page cap.</li>
+    <li>Select only columns you need; wide SOQL plus <code>Table.FromRecords</code> is a common memory spike.</li>
+    <li>Keep token in one query; reference it read-only from every pull.</li>
+    <li>Use the <strong>Advanced · DAX · Settings</strong> tab in <code>queries-job-aide.html</code> for Desktop data-load options.</li>
+  </ul>
+</main>
+</body>
+</html>

@@ -1,0 +1,32 @@
+object_label,suggested_api_name,anchor_field,pattern_notes,verify_in_org
+Account,Account,Id,POC SID joins to Account.Id; use for labels and hierarchy,true
+Account Campaign Association,Account_Campaign_Association__c,Account__c_or_AccountId,Confirm actual relationship field name in Object Manager,true
+AccountContactRole,AccountContactRole,AccountId,Standard junction to Contact,true
+AccountFeed,AccountFeed,ParentId,Chatter feed for Account; high volume — consider date filter,true
+AccountHistory,AccountHistory,AccountId,Field history; can be large — filter by date if allowed,true
+AccountShare,AccountShare,AccountId,Sharing rows; usually admin-only visibility in reports — confirm REST access,false
+AccountTeamMember,AccountTeamMember,AccountId,Team members tied to Account,true
+Address,Address__c,Parent_Account_or_Account__c,Confirm lookup API name on custom object,true
+Borrower Risk Rating,Borrower_Risk_Rating__c,Account__c,Confirm lookup API name,true
+Contact,Contact,AccountId,Primary child for most POCs,true
+Covid Customer Relief Tracker,Covid_Customer_Relief_Tracker__c,Account__c,Confirm lookup API name,true
+Credit Memo Narrative,Credit_Memo_Narrative__c,Account__c,Confirm lookup API name,true
+Event,Event,WhatId_or_AccountId,Often WhatId = Account Id; some orgs expose AccountId — validate,true
+FeedItem,FeedItem,ParentId,Polymorphic parent; filter Parent.Type = 'Account' and ParentId IN POC set,true
+Field History,Field_History__c,Account__c,Confirm lookup API name,true
+Lead,Lead,ConvertedAccountId_or_none,Not a strict Account child until converted; optional for POC match — use ConvertedAccountId if available,false
+LLC BI Account Collateral,LLC_BI__Account_Collateral__c,LLC_BI__Account__c_or_Account__c,nCino-style package; confirm package namespace and lookup,true
+LLC BI Account Covenant,LLC_BI__Account_Covenant__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Account Document,LLC_BI__AccountDocument__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Connection,LLC_BI__Connection__c,From_Account__c_To_Account__c,May link two accounts — decide which side matches POC SID,true
+LLC BI Covenant2,LLC_BI__Covenant2__c,Account_or_Loan_lookup,Confirm parent object for covenant row,true
+LLC BI Loan,LLC_BI__Loan__c,LLC_BI__Account__c,Loan tied to borrowing entity; confirm field name,true
+Loan Application,Loan_Application__c,Account__c,Confirm lookup API name,true
+Loan Clone,Loan_Clone__c,Account__c,Confirm lookup API name,true
+Note,Note,ParentId,Polymorphic — filter ParentId IN POC Account Ids and IsDeleted=false,true
+Opportunity,Opportunity,AccountId,Standard child of Account,true
+PLNDR RA PL Relationship Details,PLNDR_RA_PL_Relationship_Details__c,Account__c,Spelling may differ (Details vs Detalls) — verify,true
+Relationship Planning,Relationship_Planning__c,Account__c,Confirm lookup API name,true
+Requests,Requests__c,Account__c,Confirm lookup API name,true
+Task,Task,WhatId_or_AccountId,Same pattern as Event — validate which field your org populates for Account-linked tasks,true
+TM CDD Onboarding,TM_CDD_Onboarding__c,Account__c,Confirm lookup API name,true

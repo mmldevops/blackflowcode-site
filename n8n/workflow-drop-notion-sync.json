@@ -1,0 +1,160 @@
+{
+  "name": "BFC — Workflow 3 — Notion Auto-Sync (v2)",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "parameters": {
+        "schema": "public",
+        "tableName": "drops",
+        "events": ["insert"]
+      },
+      "name": "Supabase Trigger",
+      "type": "n8n-nodes-base.supabaseTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "parameters": {
+        "operation": "getAll",
+        "schema": "public",
+        "tableName": "blueprints",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{$json[\"new\"][\"blueprint_id\"]}}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "name": "Supabase — Fetch Blueprint",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.length}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "IF — Blueprint Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "parameters": {
+        "resource": "page",
+        "operation": "create",
+        "databaseId": "f3e7e58cd1db46208210fb608bf4c4de",
+        "title": "={{$json[0][\"name\"]}} — v{{$node[\"Supabase Trigger\"].json[\"new\"][\"version\"]}}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Version",
+              "textValue": "={{$node[\"Supabase Trigger\"].json[\"new\"][\"version\"]}}"
+            },
+            {
+              "key": "Drop Type",
+              "selectValue": "={{$node[\"Supabase Trigger\"].json[\"new\"][\"drop_type\"]}}"
+            },
+            {
+              "key": "Target Date",
+              "dateValue": "={{$node[\"Supabase Trigger\"].json[\"new\"][\"target_date\"]}}"
+            },
+            {
+              "key": "Status",
+              "selectValue": "={{$node[\"Supabase Trigger\"].json[\"new\"][\"status\"]}}"
+            },
+            {
+              "key": "Blueprint",
+              "textValue": "={{$json[0][\"name\"]}}"
+            }
+          ]
+        }
+      },
+      "name": "Notion — Create Spec Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [900, 220]
+    },
+    {
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "parameters": {
+        "operation": "update",
+        "schema": "public",
+        "tableName": "drops",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{$node[\"Supabase Trigger\"].json[\"new\"][\"id\"]}}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsToSend": {
+          "fieldValues": [
+            {
+              "fieldName": "notion_spec_url",
+              "fieldValue": "={{$json[\"url\"]}}"
+            }
+          ]
+        }
+      },
+      "name": "Supabase — Write Back notion_spec_url",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1120, 220]
+    },
+    {
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "error",
+              "value": "=Blueprint not found for drop id={{$node[\"Supabase Trigger\"].json[\"new\"][\"id\"]}} blueprint_id={{$node[\"Supabase Trigger\"].json[\"new\"][\"blueprint_id\"]}}"
+            }
+          ]
+        }
+      },
+      "name": "Set — Blueprint Missing Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Supabase Trigger": {
+      "main": [[{"node": "Supabase — Fetch Blueprint", "type": "main", "index": 0}]]
+    },
+    "Supabase — Fetch Blueprint": {
+      "main": [[{"node": "IF — Blueprint Found", "type": "main", "index": 0}]]
+    },
+    "IF — Blueprint Found": {
+      "main": [
+        [{"node": "Notion — Create Spec Page", "type": "main", "index": 0}],
+        [{"node": "Set — Blueprint Missing Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Notion — Create Spec Page": {
+      "main": [[{"node": "Supabase — Write Back notion_spec_url", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": ["bfc-release-tracker"]
+}

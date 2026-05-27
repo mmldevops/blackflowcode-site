@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 2 — POC Child Records Match</title>
+<style>
+:root{
+  --red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;
+  --white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;
+  --green:#10B981;--amber:#F59E0B;--purple:#7C3AED;
+  --sh:0 2px 12px rgba(0,0,0,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── TOP BAR ── */
+.topbar{background:var(--dark);height:54px;display:flex;align-items:center;padding:0 20px;gap:14px;border-bottom:3px solid var(--red);position:sticky;top:0;z-index:200;}
+.logo-m{width:30px;height:30px;background:var(--red);border-radius:6px;display:grid;place-items:center;font-weight:900;color:#fff;font-size:15px;flex-shrink:0;}
+.tb-title{color:#fff;font-size:13px;font-weight:700;}
+.tb-sep{width:1px;height:18px;background:rgba(255,255,255,.18);}
+.tb-sub{color:#94A3B8;font-size:12px;}
+.tb-space{flex:1;}
+.tb-live{display:flex;align-items:center;gap:6px;font-size:11px;color:#94A3B8;}
+.tb-dot{width:7px;height:7px;border-radius:50%;background:#10B981;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.tb-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#CBD5E0;font-size:11px;padding:5px 13px;border-radius:16px;cursor:pointer;}
+.tb-btn:hover{background:rgba(255,255,255,.14);}
+
+/* ── NAV TABS ── */
+.navrow{background:var(--white);border-bottom:1px solid var(--border);padding:0 20px;display:flex;gap:2px;overflow-x:auto;position:sticky;top:54px;z-index:190;}
+.navrow::-webkit-scrollbar{height:3px;}
+.navrow::-webkit-scrollbar-thumb{background:var(--border);}
+.ntab{padding:12px 15px;font-size:12px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;user-select:none;display:flex;align-items:center;gap:6px;transition:color .15s;}
+.ntab.active{color:var(--red);border-bottom-color:var(--red);}
+.ntab:hover:not(.active){color:var(--text);}
+.ntab .badge{background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:8px;min-width:18px;text-align:center;}
+
+/* ── FILTER BAR ── */
+.fbar{background:var(--white);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.fbar label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;}
+.fbar select,.fbar input[type=text]{border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:12px;color:var(--text);background:var(--bg);outline:none;cursor:pointer;}
+.fbar select:focus,.fbar input:focus{border-color:var(--blue);}
+.fbar .apply{background:var(--red);color:#fff;border:none;border-radius:6px;padding:6px 15px;font-size:12px;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.fbar .apply:hover{opacity:.85;}
+.fbar .reset{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;}
+.fbar .fspace{flex:1;}
+.fbar .stamp{font-size:11px;color:var(--muted);}
+
+/* ── PAGE CONTENT ── */
+.page{display:none;padding:20px;max-width:1420px;margin:0 auto;}
+.page.active{display:block;}
+
+/* ── ALERT BANNER ── */
+.alert{background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.alert-ico{font-size:18px;}
+.alert h4{font-size:13px;font-weight:700;color:#DC2626;}
+.alert p{font-size:12px;color:#B91C1C;margin-top:1px;}
+.alert .abtn{margin-left:auto;background:#DC2626;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.alert .close-alert{background:none;border:none;color:#DC2626;font-size:16px;cursor:pointer;margin-left:8px;padding:0 4px;}
+
+/* ── KPI ROW ── */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px;}
+.kpi{background:var(--white);border-radius:10px;padding:16px;border:1px solid var(--border);box-shadow:var(--sh);position:relative;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 5px 18px rgba(0,0,0,.1);}
+.kpi.selected-kpi{box-shadow:0 0 0 2px var(--red);}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.k-r::before{background:var(--red);}
+.k-b::before{background:var(--blue);}
+.k-g::before{background:var(--green);}
+.k-a::before{background:var(--amber);}
+.k-p::before{background:var(--purple);}
+.k-d::before{background:var(--dark);}
+.kpi .lbl{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;margin-bottom:7px;}
+.kpi .val{font-size:24px;font-weight:800;color:var(--dark);}
+.kpi .sub{font-size:11px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:5px;}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;}
+.t-g{background:#DCFCE7;color:#16A34A;}
+.t-r{background:#FEE2E2;color:#DC2626;}
+.t-n{background:#F1F5F9;color:#64748B;}
+.t-a{background:#FEF3C7;color:#D97706;}
+
+/* ── PANELS ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px;}
+.grid21{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px;}
+.full{margin-bottom:18px;}
+.panel{background:var(--white);border-radius:10px;padding:18px;border:1px solid var(--border);box-shadow:var(--sh);}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.ph h4{font-size:13px;font-weight:700;color:var(--dark);}
+.ph .pa{font-size:11px;color:var(--blue);cursor:pointer;font-weight:600;background:none;border:none;}
+.ph .pa:hover{text-decoration:underline;}
+
+/* ── OBJ CARDS ── */
+.obj-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+.oc{background:var(--white);border-radius:10px;padding:14px;border:1px solid var(--border);box-shadow:var(--sh);cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s;}
+.oc:hover{transform:translateY(-2px);box-shadow:0 5px 16px rgba(0,0,0,.1);}
+.oc.oc-sel{border-color:var(--blue);box-shadow:0 0 0 2px rgba(0,102,204,.18);}
+.oc .oi{font-size:22px;margin-bottom:7px;}
+.oc .on{font-size:12px;font-weight:700;color:var(--dark);margin-bottom:3px;}
+.oc .ov{font-size:20px;font-weight:800;color:var(--dark);}
+.oc .om{font-size:11px;color:var(--muted);margin-top:3px;}
+.oc .op{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;margin-top:5px;}
+
+/* ── DATA TABLE ── */
+.tbl-wrap{overflow-x:auto;}
+table.dt{width:100%;border-collapse:collapse;font-size:12px;}
+table.dt th{background:var(--dark);color:#fff;padding:9px 11px;text-align:left;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;user-select:none;}
+table.dt th:hover{background:#2d2d4e;}
+table.dt th .sort-ico{margin-left:4px;opacity:.5;font-size:10px;}
+table.dt th.asc .sort-ico::after{content:'▲';}
+table.dt th.desc .sort-ico::after{content:'▼';}
+table.dt th:not(.asc):not(.desc) .sort-ico::after{content:'⇅';}
+table.dt td{padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:middle;}
+table.dt tr:hover td{background:#F8FAFF;}
+table.dt .mono{font-family:'Cascadia Code','Consolas',monospace;font-size:11px;color:var(--muted);}
+table.dt .fw{font-weight:600;color:var(--dark);}
+.chip{display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+.c-m{background:#DCFCE7;color:#16A34A;}
+.c-p{background:#FEF3C7;color:#D97706;}
+.c-o{background:#FEE2E2;color:#DC2626;}
+.c-q{background:#EEF2FF;color:#4F46E5;}
+.lob-sbb{background:#EFF6FF;color:#2563EB;}
+.lob-sc{background:#F5F3FF;color:#7C3AED;}
+.lob-tr{background:#ECFDF5;color:#059669;}
+.lob-ci{background:#FEF3C7;color:#D97706;}
+.score-row{display:flex;align-items:center;gap:7px;}
+.score-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.sb-fill{height:100%;border-radius:3px;}
+.score-n{font-size:11px;font-weight:700;width:26px;text-align:right;}
+
+/* ── PAGINATION ── */
+.pgn{display:flex;align-items:center;justify-content:space-between;margin-top:13px;padding-top:11px;border-top:1px solid var(--border);}
+.pgn span{font-size:12px;color:var(--muted);}
+.pgn-btns{display:flex;gap:3px;}
+.pb{width:27px;height:27px;border-radius:6px;border:1px solid var(--border);background:var(--white);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s;}
+.pb:hover{background:var(--bg);}
+.pb.act{background:var(--red);color:#fff;border-color:var(--red);}
+
+/* ── DONUT SVG ── */
+.donut-ring{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.dl{display:flex;flex-direction:column;gap:7px;}
+.dli{display:flex;align-items:center;gap:8px;}
+.dd{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.dn{font-size:12px;color:var(--muted);}
+.dv{font-size:12px;font-weight:700;color:var(--dark);margin-left:auto;}
+
+/* ── BAR CHART ── */
+.barchart{display:flex;align-items:flex-end;gap:8px;height:110px;padding:0 2px;}
+.bw{display:flex;flex-direction:column;align-items:center;flex:1;height:100%;}
+.bspc{flex:1;}
+.bcol{width:100%;border-radius:4px 4px 0 0;}
+.blbl{font-size:10px;color:var(--muted);margin-top:4px;text-align:center;line-height:1.3;}
+.bval{font-size:10px;font-weight:700;color:var(--dark);margin-bottom:2px;}
+
+/* ── PCT BAR ── */
+.pct-wrap{display:flex;align-items:center;gap:6px;}
+.pct-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.pct-fill{height:100%;border-radius:3px;}
+.pct-n{font-size:11px;font-weight:700;width:32px;text-align:right;}
+
+/* ── TIMELINE ── */
+.tl{position:relative;padding-left:22px;}
+.tl::before{content:'';position:absolute;left:7px;top:0;bottom:0;width:2px;background:var(--border);}
+.tl-item{position:relative;margin-bottom:14px;}
+.tl-dot{position:absolute;left:-19px;top:4px;width:11px;height:11px;border-radius:50%;border:2px solid #fff;}
+.tl-box{background:var(--bg);border-radius:7px;padding:9px 12px;}
+.tl-type{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+.tl-name{font-size:12px;font-weight:600;color:var(--dark);margin-top:1px;}
+.tl-date{font-size:11px;color:var(--muted);margin-top:1px;}
+
+/* ── QUALITY SCORE CARD ── */
+.qcard{background:var(--bg);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.qcard .qn{font-size:12px;font-weight:600;color:var(--dark);flex:1;}
+.qcard .qobj{font-size:11px;color:var(--muted);flex:1;}
+
+/* ── MATRIX TABLE ── */
+table.mtrx{width:100%;border-collapse:collapse;font-size:11px;}
+table.mtrx th{background:var(--bg);color:var(--muted);padding:8px 10px;font-size:10px;font-weight:700;border:1px solid var(--border);}
+table.mtrx td{padding:8px 10px;border:1px solid var(--border);text-align:center;}
+table.mtrx .mname{text-align:left;font-weight:600;color:var(--dark);background:#fff;min-width:130px;}
+.mh{background:#DCFCE7;color:#16A34A;font-weight:700;border-radius:3px;}
+.mm{background:#FEF3C7;color:#D97706;font-weight:700;border-radius:3px;}
+.ml{background:#FEE2E2;color:#DC2626;font-weight:700;border-radius:3px;}
+.mn{background:#F8FAFC;color:#CBD5E0;}
+
+/* ── SEARCH BOX ── */
+.srch{position:relative;flex:0 0 auto;}
+.srch input{border:1px solid var(--border);border-radius:6px;padding:5px 9px 5px 28px;font-size:12px;background:var(--bg);outline:none;width:180px;}
+.srch input:focus{border-color:var(--blue);}
+.srch::before{content:'🔍';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;pointer-events:none;}
+
+/* ── NO DATA ── */
+.nodata{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
+
+/* ── CODE BLOCK ── */
+.code{background:#1E1E2E;color:#CDD6F4;font-family:'Cascadia Code','Consolas',monospace;font-size:11px;padding:12px 14px;border-radius:8px;overflow-x:auto;line-height:1.6;margin-top:8px;}
+.kw{color:#89DCEB;} .str{color:#A6E3A1;} .cm{color:#585b70;} .fn{color:#CBA6F7;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .kpis{grid-template-columns:repeat(3,1fr);}
+  .obj-grid{grid-template-columns:repeat(2,1fr);}
+  .grid2,.grid21,.grid3{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo-m">M</div>
+  <span class="tb-title">Blackflow Cloud · TD Banking</span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub">Task 2 — POC Master Records: Child Match</span>
+  <div class="tb-space"></div>
+  <div class="tb-live"><div class="tb-dot"></div>Live · REST API v59.0</div>
+  <button class="tb-btn" onclick="exportCSV()">⬇ Export CSV</button>
+  <button class="tb-btn" onclick="printPage()">🖨 Print</button>
+</div>
+
+<!-- NAV TABS -->
+<div class="navrow" id="navrow">
+  <div class="ntab active" data-tab="overview" onclick="switchTab(this,'overview')">📊 Match Overview</div>
+  <div class="ntab" data-tab="matrix" onclick="switchTab(this,'matrix')">🗂 Object Matrix</div>
+  <div class="ntab" data-tab="orphans" onclick="switchTab(this,'orphans')">🚨 Orphan Accounts <span class="badge" id="orphan-badge">47</span></div>
+  <div class="ntab" data-tab="profiles" onclick="switchTab(this,'profiles')">📋 Account Profiles</div>
+  <div class="ntab" data-tab="timeline" onclick="switchTab(this,'timeline')">⏱ Activity Timeline</div>
+  <div class="ntab" data-tab="quality" onclick="switchTab(this,'quality')">📈 Data Quality</div>
+  <div class="ntab" data-tab="delta" onclick="switchTab(this,'delta')">⚡ Delta Changes</div>
+  <div class="ntab" data-tab="connection" onclick="switchTab(this,'connection')">🔌 API Connection</div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="fbar">
+  <label>Child Object</label>
+  <select id="f-object" onchange="applyFilters()">
+    <option value="">All Objects</option>
+    <option>Contact</option><option>Opportunity</option><option>Case</option>
+    <option>Contract</option><option>Task</option><option>Event</option>
+    <option>AccountTeamMember</option><option>ContentDocumentLink</option>
+    <option>OpportunityTeamMember</option>
+  </select>
+  <label>Match Status</label>
+  <select id="f-status" onchange="applyFilters()">
+    <option value="">All Statuses</option>
+    <option value="Matched">Matched</option>
+    <option value="Partial">Partial Match</option>
+    <option value="Orphan">Orphan</option>
+  </select>
+  <label>LOB</label>
+  <select id="f-lob" onchange="applyFilters()">
+    <option value="">All LOBs</option>
+    <option>SBB</option><option>SBCAT</option>
+    <option>Treasury</option><option>CIE LOD</option>
+  </select>
+  <div class="srch"><input type="text" id="f-search" placeholder="Name or Account ID…" oninput="applyFilters()"></div>
+  <button class="reset" onclick="resetFilters()">✕ Reset</button>
+  <button class="apply" onclick="applyFilters()">Apply Filters</button>
+  <div class="fspace"></div>
+  <span class="stamp" id="refresh-stamp">Last refresh: May 14, 2026 · 09:42 AM</span>
+</div>
+
+<!-- ═══════════════ PAGE: OVERVIEW ═══════════════ -->
+<div class="page active" id="page-overview">
+
+  <div class="alert" id="orphan-alert">
+    <div class="alert-ico">⚠️</div>
+    <div>
+      <h4>47 Orphan Accounts Detected</h4>
+      <p>AccountIds in POC Master with zero child records across all objects. Action required before mid-review May 26.</p>
+    </div>
+    <button class="abtn" onclick="switchTab(document.querySelector('[data-tab=orphans]'),'orphans')">View Orphans →</button>
+    <button class="close-alert" onclick="document.getElementById('orphan-alert').style.display='none'">✕</button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis" id="kpi-row">
+    <div class="kpi k-b" onclick="filterByStatus('')"><div class="lbl">POC Master IDs</div><div class="val" id="k-total">1,284</div><div class="sub"><span class="tag t-n">AccountIds loaded</span></div></div>
+    <div class="kpi k-g" onclick="filterByStatus('Matched')"><div class="lbl">Fully Matched</div><div class="val" id="k-matched">1,089</div><div class="sub"><span class="tag t-g" id="k-mpct">84.8%</span> match rate</div></div>
+    <div class="kpi k-a" onclick="filterByStatus('Partial')"><div class="lbl">Partial Match</div><div class="val" id="k-partial">148</div><div class="sub"><span class="tag t-a">11.5%</span> ≥1 obj missing</div></div>
+    <div class="kpi k-r" onclick="filterByStatus('Orphan')"><div class="lbl">Orphan Accounts</div><div class="val" id="k-orphan">47</div><div class="sub"><span class="tag t-r">3.7%</span> no child records</div></div>
+    <div class="kpi k-p"><div class="lbl">Total Child Records</div><div class="val" id="k-records">38,472</div><div class="sub"><span class="tag t-g">▲ +312 delta</span></div></div>
+    <div class="kpi k-d"><div class="lbl">Objects Queried</div><div class="val">12</div><div class="sub"><span class="tag t-n">via REST API</span></div></div>
+  </div>
+
+  <!-- Object Coverage Cards -->
+  <h4 style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:12px;">Child Object Coverage</h4>
+  <div class="obj-grid" id="obj-cards">
+    <!-- populated by JS -->
+  </div>
+
+  <!-- Match Rate Table + Donut -->
+  <div class="grid21">
+    <div class="panel">
+      <div class="ph"><h4>📊 Match Rate by Object</h4><button class="pa" onclick="exportCSV()">Export CSV →</button></div>
+      <div class="tbl-wrap">
+        <table class="dt" id="match-table">
+          <thead>
+            <tr>
+              <th onclick="sortTable('match-table',0)">Object<span class="sort-ico"></span></th>
+              <th onclick="sortTable('match-table',1)">Records<span class="sort-ico"></span></th>
+              <th onclick="sortTable('match-table',2)">Accts Matched<span class="sort-ico"></span></th>
+              <th onclick="sortTable('match-table',3)">Match %<span class="sort-ico"></span></th>
+              <th onclick="sortTable('match-table',4)">Orphan Accts<span class="sort-ico"></span></th>
+            </tr>
+          </thead>
+          <tbody id="match-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>🍩 Distribution</h4></div>
+      <div class="donut-ring">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="48" fill="none" stroke="#E0E4EC" stroke-width="20"/>
+          <circle cx="65" cy="65" r="48" fill="none" stroke="#10B981" stroke-width="20"
+            stroke-dasharray="255 301.6" stroke-dashoffset="75.4" transform="rotate(-90 65 65)"/>
+          <circle cx="65" cy="65" r="48" fill="none" stroke="#F59E0B" stroke-width="20"
+            stroke-dasharray="34.7 301.6" stroke-dashoffset="-179.6" transform="rotate(-90 65 65)"/>
+          <circle cx="65" cy="65" r="48" fill="none" stroke="#ED1D24" stroke-width="20"
+            stroke-dasharray="11.1 301.6" stroke-dashoffset="-214.3" transform="rotate(-90 65 65)"/>
+          <text x="65" y="61" text-anchor="middle" font-size="17" font-weight="800" fill="#1A1A2E">84.8%</text>
+          <text x="65" y="74" text-anchor="middle" font-size="10" fill="#6B7280">Matched</text>
+        </svg>
+        <div class="dl">
+          <div class="dli"><div class="dd" style="background:#10B981"></div><span class="dn">Fully Matched</span><span class="dv" style="margin-left:12px;">1,089</span></div>
+          <div class="dli"><div class="dd" style="background:#F59E0B"></div><span class="dn">Partial</span><span class="dv" style="margin-left:12px;">148</span></div>
+          <div class="dli"><div class="dd" style="background:#ED1D24"></div><span class="dn">Orphan</span><span class="dv" style="margin-left:12px;">47</span></div>
+        </div>
+      </div>
+      <div class="ph" style="margin-top:18px;margin-bottom:10px;"><h4>Records by LOB</h4></div>
+      <div class="barchart">
+        <div class="bw"><div class="bval">12,481</div><div class="bspc"></div><div class="bcol" style="background:#0066CC;height:100%;"></div><div class="blbl">SBB</div></div>
+        <div class="bw"><div class="bval">9,314</div><div class="bspc"></div><div class="bcol" style="background:#7C3AED;height:74.6%;"></div><div class="blbl">SBCAT</div></div>
+        <div class="bw"><div class="bval">10,877</div><div class="bspc"></div><div class="bcol" style="background:#10B981;height:87.1%;"></div><div class="blbl">Treasury</div></div>
+        <div class="bw"><div class="bval">5,800</div><div class="bspc"></div><div class="bcol" style="background:#F59E0B;height:46.5%;"></div><div class="blbl">CIE LOD</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Table -->
+  <div class="full panel">
+    <div class="ph">
+      <h4>📋 POC Master Account List <span style="font-size:11px;font-weight:400;color:var(--muted)" id="acct-count"></span></h4>
+      <button class="pa" onclick="exportCSV()">Export →</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="dt" id="acct-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('acct-table',0)">Account ID<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',1)">Account Name<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',2)">LOB<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',3)">Contacts<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',4)">Opportunities<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',5)">Cases<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',6)">Contracts<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',7)">Tasks<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',8)">Status<span class="sort-ico"></span></th>
+            <th onclick="sortTable('acct-table',9)">Quality Score<span class="sort-ico"></span></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="acct-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pgn">
+      <span id="pgn-info"></span>
+      <div class="pgn-btns" id="pgn-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: OBJECT MATRIX ═══════════════ -->
+<div class="page" id="page-matrix">
+  <div class="panel">
+    <div class="ph"><h4>🗂 Cross-Object Presence Matrix — All Accounts</h4><button class="pa" onclick="exportCSV()">Export Matrix →</button></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Rows = AccountIds · Columns = Child Object types · Cell = record count. Red=0, Amber=1–2, Green=3+</p>
+    <div class="tbl-wrap">
+      <table class="mtrx" id="matrix-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;min-width:130px;">Account Name</th>
+            <th>LOB</th><th>Contact</th><th>Opportunity</th><th>Case</th>
+            <th>Contract</th><th>Task</th><th>Event</th><th>Acct Team</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="matrix-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pgn">
+      <span id="matrix-pgn-info"></span>
+      <div class="pgn-btns" id="matrix-pgn-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: ORPHAN ACCOUNTS ═══════════════ -->
+<div class="page" id="page-orphans">
+  <div class="alert" style="margin-bottom:18px;">
+    <div class="alert-ico">🔴</div>
+    <div>
+      <h4>47 accounts have zero child records across all objects</h4>
+      <p>These accounts exist in the POC Master spreadsheet but have no associated Salesforce data. Likely migration gaps or inactive accounts.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><h4>🚨 Orphan Account List</h4><button class="pa" onclick="exportCSV()">Export Orphan List →</button></div>
+    <div class="tbl-wrap">
+      <table class="dt" id="orphan-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('orphan-table',0)">Account ID<span class="sort-ico"></span></th>
+            <th onclick="sortTable('orphan-table',1)">Account Name<span class="sort-ico"></span></th>
+            <th onclick="sortTable('orphan-table',2)">LOB<span class="sort-ico"></span></th>
+            <th onclick="sortTable('orphan-table',3)">Account Type<span class="sort-ico"></span></th>
+            <th onclick="sortTable('orphan-table',4)">Created Date<span class="sort-ico"></span></th>
+            <th onclick="sortTable('orphan-table',5)">Owner<span class="sort-ico"></span></th>
+            <th>Recommended Action</th>
+          </tr>
+        </thead>
+        <tbody id="orphan-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: ACCOUNT PROFILES ═══════════════ -->
+<div class="page" id="page-profiles">
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>🔍 Select Account to Profile</h4></div>
+      <div class="fbar" style="border:none;padding:0;margin-bottom:14px;flex-wrap:nowrap;">
+        <div class="srch" style="flex:1;"><input type="text" id="profile-search" placeholder="Search account name…" oninput="filterProfileList()" style="width:100%;"></div>
+      </div>
+      <div id="profile-list" style="max-height:340px;overflow-y:auto;"></div>
+    </div>
+    <div class="panel" id="profile-detail">
+      <div class="ph"><h4>📋 Account Profile — Select an account</h4></div>
+      <p style="font-size:12px;color:var(--muted);">Click an account on the left to view its full child record profile.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: ACTIVITY TIMELINE ═══════════════ -->
+<div class="page" id="page-timeline">
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>⏱ Cross-Object Timeline</h4>
+        <select id="tl-account" onchange="renderTimeline()" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;">
+          <option>Meridian Financial Group</option>
+          <option>Apex Capital Partners</option>
+          <option>Clearwater Investments LLC</option>
+          <option>Harbor Trust Co.</option>
+          <option>Redwood Asset Management</option>
+        </select>
+      </div>
+      <div class="tl" id="timeline-body"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>📊 Activity Volume by Type</h4></div>
+      <div class="barchart" id="tl-barchart">
+        <div class="bw"><div class="bval">34</div><div class="bspc"></div><div class="bcol" style="background:#3B82F6;height:100%;"></div><div class="blbl">Contacts</div></div>
+        <div class="bw"><div class="bval">21</div><div class="bspc"></div><div class="bcol" style="background:#10B981;height:61.7%;"></div><div class="blbl">Opps</div></div>
+        <div class="bw"><div class="bval">14</div><div class="bspc"></div><div class="bcol" style="background:#F59E0B;height:41.2%;"></div><div class="blbl">Cases</div></div>
+        <div class="bw"><div class="bval">48</div><div class="bspc"></div><div class="bcol" style="background:#8B5CF6;height:100%;"></div><div class="blbl">Tasks</div></div>
+        <div class="bw"><div class="bval">8</div><div class="bspc"></div><div class="bcol" style="background:#EC4899;height:23.5%;"></div><div class="blbl">Contracts</div></div>
+        <div class="bw"><div class="bval">19</div><div class="bspc"></div><div class="bcol" style="background:#14B8A6;height:55.9%;"></div><div class="blbl">Events</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: DATA QUALITY ═══════════════ -->
+<div class="page" id="page-quality">
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr);">
+    <div class="kpi k-g"><div class="lbl">Avg Quality Score</div><div class="val">67</div><div class="sub"><span class="tag t-a">/ 100 points</span></div></div>
+    <div class="kpi k-r"><div class="lbl">Score = 0 (Orphan)</div><div class="val">47</div><div class="sub"><span class="tag t-r">No child data</span></div></div>
+    <div class="kpi k-a"><div class="lbl">Score 1–49 (Low)</div><div class="val">218</div><div class="sub"><span class="tag t-a">Needs attention</span></div></div>
+    <div class="kpi k-g"><div class="lbl">Score 80–100 (High)</div><div class="val">641</div><div class="sub"><span class="tag t-g">Healthy</span></div></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>📈 Quality Score Distribution</h4></div>
+      <div class="barchart" style="height:130px;">
+        <div class="bw"><div class="bval">47</div><div class="bspc"></div><div class="bcol" style="background:#ED1D24;height:7.3%;"></div><div class="blbl">0<br>(Orphan)</div></div>
+        <div class="bw"><div class="bval">113</div><div class="bspc"></div><div class="bcol" style="background:#F97316;height:17.6%;"></div><div class="blbl">1–20</div></div>
+        <div class="bw"><div class="bval">105</div><div class="bspc"></div><div class="bcol" style="background:#F59E0B;height:16.4%;"></div><div class="blbl">21–40</div></div>
+        <div class="bw"><div class="bval">194</div><div class="bspc"></div><div class="bcol" style="background:#EAB308;height:30.3%;"></div><div class="blbl">41–60</div></div>
+        <div class="bw"><div class="bval">284</div><div class="bspc"></div><div class="bcol" style="background:#84CC16;height:44.3%;"></div><div class="blbl">61–80</div></div>
+        <div class="bw"><div class="bval">641</div><div class="bspc"></div><div class="bcol" style="background:#10B981;height:100%;"></div><div class="blbl">81–100</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>📋 Quality Scoring Methodology</h4></div>
+      <div class="qcard"><div class="qn">Contact present</div><div class="qobj" style="font-weight:700;color:#10B981;">+20 pts</div><div style="font-size:11px;color:var(--muted);">≥1 Contact linked</div></div>
+      <div class="qcard"><div class="qn">Opportunity present</div><div class="qobj" style="font-weight:700;color:#10B981;">+20 pts</div><div style="font-size:11px;color:var(--muted);">≥1 Open/Closed Opp</div></div>
+      <div class="qcard"><div class="qn">Contract active</div><div class="qobj" style="font-weight:700;color:#10B981;">+20 pts</div><div style="font-size:11px;color:var(--muted);">Status = Activated</div></div>
+      <div class="qcard"><div class="qn">Cases resolved</div><div class="qobj" style="font-weight:700;color:#10B981;">+20 pts</div><div style="font-size:11px;color:var(--muted);">Case Status = Closed</div></div>
+      <div class="qcard"><div class="qn">Activities logged</div><div class="qobj" style="font-weight:700;color:#10B981;">+20 pts</div><div style="font-size:11px;color:var(--muted);">≥1 Task or Event</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: DELTA CHANGES ═══════════════ -->
+<div class="page" id="page-delta">
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr);">
+    <div class="kpi k-g"><div class="lbl">Net New Records</div><div class="val">+312</div><div class="sub"><span class="tag t-g">Since last refresh</span></div></div>
+    <div class="kpi k-a"><div class="lbl">Modified Records</div><div class="val">179</div><div class="sub"><span class="tag t-a">Updated fields</span></div></div>
+    <div class="kpi k-r"><div class="lbl">Removed Records</div><div class="val">-38</div><div class="sub"><span class="tag t-r">Deleted from SF</span></div></div>
+    <div class="kpi k-b"><div class="lbl">New Matched Accts</div><div class="val">+14</div><div class="sub"><span class="tag t-g">Previously orphan</span></div></div>
+  </div>
+  <div class="full panel">
+    <div class="ph"><h4>⚡ Delta Change Log — Last Refresh vs. Previous Run</h4><button class="pa" onclick="exportCSV()">Export Delta →</button></div>
+    <div class="tbl-wrap">
+      <table class="dt" id="delta-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('delta-table',0)">Object<span class="sort-ico"></span></th>
+            <th onclick="sortTable('delta-table',1)">Added<span class="sort-ico"></span></th>
+            <th onclick="sortTable('delta-table',2)">Modified<span class="sort-ico"></span></th>
+            <th onclick="sortTable('delta-table',3)">Removed<span class="sort-ico"></span></th>
+            <th onclick="sortTable('delta-table',4)">Net Change<span class="sort-ico"></span></th>
+            <th>Last Modified Date</th>
+          </tr>
+        </thead>
+        <tbody id="delta-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE: API CONNECTION ═══════════════ -->
+<div class="page" id="page-connection">
+  <div class="grid2">
+    <div class="panel">
+      <div class="ph"><h4>🔌 Salesforce REST API — M Query Base Template</h4></div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Task 2 direct URL connection. OAuth 2.0 Connected App. No new fields or objects.</p>
+      <div class="code">
+<span class="cm">// ── Task 2: Salesforce REST API Base Function ──</span>
+<span class="kw">let</span>
+  InstanceUrl  = <span class="str">"https://yourorg.salesforce.com"</span>,
+  ApiVersion   = <span class="str">"v59.0"</span>,
+
+  <span class="cm">// OAuth Token Request</span>
+  TokenBody = <span class="str">"grant_type=password"</span>
+    &amp; <span class="str">"&amp;client_id="</span>     &amp; ClientId
+    &amp; <span class="str">"&amp;client_secret="</span>  &amp; ClientSecret
+    &amp; <span class="str">"&amp;username="</span>      &amp; SFUsername
+    &amp; <span class="str">"&amp;password="</span>      &amp; SFPassword,
+
+  TokenResp = Json.Document(Web.Contents(
+    InstanceUrl &amp; <span class="str">"/services/oauth2/token"</span>,
+    [ Content  = Text.ToBinary(TokenBody),
+      Headers  = [#<span class="str">"Content-Type"</span> = <span class="str">"application/x-www-form-urlencoded"</span>] ]
+  )),
+  Token = TokenResp[access_token],
+
+  <span class="cm">// Execute SOQL</span>
+  <span class="fn">QuerySF</span> = (<span class="kw">soql</span>) =&gt;
+    Json.Document(Web.Contents(
+      InstanceUrl &amp; <span class="str">"/services/data/"</span> &amp; ApiVersion &amp; <span class="str">"/query/?q="</span>
+        &amp; Uri.EscapeDataString(soql),
+      [ Headers = [Authorization = <span class="str">"Bearer "</span> &amp; Token] ]
+    ))[records]
+<span class="kw">in</span>
+  QuerySF
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h4>📦 AccountId Chunking — Bulk Match Template</h4></div>
+      <div class="code">
+<span class="cm">// ── Chunk AccountIds into 200-row batches ──</span>
+<span class="kw">let</span>
+  Source     = Excel.Workbook(File.Contents(<span class="str">"POC Master Records.xlsx"</span>)),
+  Sheet      = Source{[Item=<span class="str">"Sheet1"</span>]}[Data],
+  Ids        = Table.Column(Sheet, <span class="str">"AccountId"</span>),
+
+  <span class="cm">// Normalize: trim, uppercase, validate length</span>
+  CleanIds   = List.Transform(Ids, <span class="kw">each</span>
+    Text.Upper(Text.Trim(_))),
+  ValidIds   = List.Select(CleanIds, <span class="kw">each</span>
+    Text.Length(_) = 15 <span class="kw">or</span> Text.Length(_) = 18),
+
+  <span class="cm">// Split into 200-item batches</span>
+  Chunks     = List.Split(ValidIds, 200),
+
+  <span class="cm">// Build SOQL per chunk + fetch</span>
+  Results    = List.Transform(Chunks, <span class="kw">each</span>
+    QuerySF(<span class="str">"SELECT Id, Name, AccountId FROM Contact WHERE AccountId IN ('"</span>
+      &amp; Text.Combine(_, <span class="str">"','"</span>) &amp; <span class="str">"')"</span>)),
+
+  Combined   = Table.Combine(List.Transform(Results,
+    Record.ToTable))
+<span class="kw">in</span>
+  Combined
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const LOBs = ['SBB','SBCAT','Treasury','CIE LOD'];
+const STATUSES = ['Matched','Matched','Matched','Matched','Matched','Partial','Partial','Orphan'];
+
+const ACCTS = [
+  {id:'0011X00002ABCDE',name:'Meridian Financial Group',lob:'SBB',contacts:14,opps:8,cases:3,contracts:2,tasks:21,status:'Matched',score:92},
+  {id:'0011X00002FGHIJ',name:'Apex Capital Partners',lob:'Treasury',contacts:7,opps:5,cases:0,contracts:4,tasks:12,status:'Partial',score:68},
+  {id:'0011X00002KLMNO',name:'Northbridge Commercial',lob:'SBCAT',contacts:0,opps:0,cases:0,contracts:0,tasks:0,status:'Orphan',score:0},
+  {id:'0011X00002PQRST',name:'Clearwater Investments LLC',lob:'CIE LOD',contacts:22,opps:11,cases:7,contracts:3,tasks:34,status:'Matched',score:100},
+  {id:'0011X00002UVWXY',name:'Sterling Bank Group',lob:'SBB',contacts:3,opps:0,cases:2,contracts:0,tasks:5,status:'Partial',score:40},
+  {id:'0011X00002ZABCD',name:'Harbor Trust Co.',lob:'Treasury',contacts:18,opps:9,cases:4,contracts:6,tasks:28,status:'Matched',score:88},
+  {id:'0011X00002EFGHI',name:'Pinnacle Growth Fund',lob:'SBCAT',contacts:0,opps:0,cases:0,contracts:0,tasks:0,status:'Orphan',score:0},
+  {id:'0011X00002JKLMN',name:'Redwood Asset Management',lob:'CIE LOD',contacts:9,opps:6,cases:1,contracts:2,tasks:14,status:'Matched',score:76},
+  {id:'0011X00002QRSTU',name:'Blue Ridge Capital',lob:'SBB',contacts:11,opps:4,cases:2,contracts:1,tasks:18,status:'Matched',score:80},
+  {id:'0011X00002VWXYZ',name:'Lakefront Advisory',lob:'SBCAT',contacts:5,opps:2,cases:0,contracts:0,tasks:7,status:'Partial',score:48},
+  {id:'0011X00002BCDEF',name:'Summit Partners LLC',lob:'Treasury',contacts:19,opps:12,cases:6,contracts:5,tasks:31,status:'Matched',score:96},
+  {id:'0011X00002GHIJK',name:'Pacific Growth Fund',lob:'CIE LOD',contacts:0,opps:0,cases:0,contracts:0,tasks:0,status:'Orphan',score:0},
+  {id:'0011X00002LMNOP',name:'Valley Financial Group',lob:'SBB',contacts:8,opps:5,cases:3,contracts:2,tasks:16,status:'Matched',score:84},
+  {id:'0011X00002QRSTUV',name:'Cornerstone Trust',lob:'Treasury',contacts:12,opps:7,cases:2,contracts:3,tasks:22,status:'Matched',score:90},
+  {id:'0011X00002WXYZ1',name:'Horizon Capital Group',lob:'SBCAT',contacts:0,opps:1,cases:0,contracts:0,tasks:3,status:'Partial',score:28},
+  {id:'0011X00002ABCD2',name:'Metro Business Bank',lob:'SBB',contacts:16,opps:9,cases:5,contracts:4,tasks:25,status:'Matched',score:94},
+  {id:'0011X00002EFGH3',name:'Northeast Trading Co.',lob:'CIE LOD',contacts:0,opps:0,cases:0,contracts:0,tasks:0,status:'Orphan',score:0},
+  {id:'0011X00002IJKL4',name:'Golden Gate Advisors',lob:'SBCAT',contacts:6,opps:3,cases:1,contracts:1,tasks:10,status:'Matched',score:72},
+  {id:'0011X00002MNOP5',name:'Riverstone Capital',lob:'Treasury',contacts:14,opps:8,cases:4,contracts:3,tasks:20,status:'Matched',score:86},
+  {id:'0011X00002QRST6',name:'Westfield Banking Group',lob:'SBB',contacts:2,opps:0,cases:1,contracts:0,tasks:4,status:'Partial',score:32}
+];
+
+const OBJ_DATA = [
+  {icon:'👤',name:'Contact',records:14832,matched:1201,total:1284,pct:93.5},
+  {icon:'💼',name:'Opportunity',records:7219,matched:1043,total:1284,pct:81.2},
+  {icon:'📋',name:'Case',records:4104,matched:892,total:1284,pct:69.5},
+  {icon:'📄',name:'Contract',records:2847,matched:788,total:1284,pct:61.4},
+  {icon:'✅',name:'Task',records:5631,matched:1107,total:1284,pct:86.2},
+  {icon:'📅',name:'Event',records:2014,matched:731,total:1284,pct:56.9},
+  {icon:'🏦',name:'AccountTeamMember',records:891,matched:614,total:1284,pct:47.8},
+  {icon:'📂',name:'ContentDocumentLink',records:934,matched:571,total:1284,pct:44.5}
+];
+
+const DELTA_DATA = [
+  {obj:'Contact',added:34,modified:12,removed:2,net:32,date:'May 14, 2026'},
+  {obj:'Opportunity',added:18,modified:47,removed:6,net:12,date:'May 13, 2026'},
+  {obj:'Case',added:9,modified:23,removed:14,net:-5,date:'May 13, 2026'},
+  {obj:'Contract',added:7,modified:8,removed:0,net:7,date:'May 12, 2026'},
+  {obj:'Task',added:241,modified:88,removed:15,net:226,date:'May 14, 2026'},
+  {obj:'Event',added:22,modified:14,removed:4,net:18,date:'May 13, 2026'},
+  {obj:'AccountTeamMember',added:3,modified:1,removed:1,net:2,date:'May 11, 2026'},
+  {obj:'ContentDocumentLink',added:15,modified:6,removed:8,net:7,date:'May 12, 2026'}
+];
+
+const TL_EVENTS = {
+  'Meridian Financial Group': [
+    {type:'Opportunity',color:'#10B981',name:'Q2 Expansion Deal — Closed Won',date:'May 12, 2026'},
+    {type:'Task',color:'#8B5CF6',name:'Follow-up: Contract Review',date:'May 10, 2026'},
+    {type:'Contact',color:'#3B82F6',name:'Sarah Chen added as Primary Contact',date:'May 8, 2026'},
+    {type:'Case',color:'#F59E0B',name:'CASE-00912: Onboarding Issue — Resolved',date:'May 3, 2026'},
+    {type:'Contract',color:'#EC4899',name:'MSA Amendment 3 — Activated',date:'Apr 28, 2026'}
+  ],
+  'Apex Capital Partners': [
+    {type:'Task',color:'#8B5CF6',name:'Treasury Review Q1',date:'May 11, 2026'},
+    {type:'Opportunity',color:'#10B981',name:'Capital Infusion Deal — In Progress',date:'May 7, 2026'},
+    {type:'Contact',color:'#3B82F6',name:'Mark Torres — New Stakeholder',date:'Apr 30, 2026'}
+  ],
+  default: [
+    {type:'Contact',color:'#3B82F6',name:'Primary contact updated',date:'May 9, 2026'},
+    {type:'Task',color:'#8B5CF6',name:'Annual review scheduled',date:'May 5, 2026'},
+    {type:'Opportunity',color:'#10B981',name:'Renewal opportunity created',date:'Apr 28, 2026'}
+  ]
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let filteredAccts = [...ACCTS];
+let currentPage = 1;
+const PAGE_SIZE = 8;
+let matrixPage = 1;
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────────
+function switchTab(el, tabId) {
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tabId).classList.add('active');
+  if (tabId === 'matrix') renderMatrix();
+  if (tabId === 'orphans') renderOrphans();
+  if (tabId === 'profiles') renderProfileList();
+  if (tabId === 'timeline') renderTimeline();
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const obj    = document.getElementById('f-object').value;
+  const status = document.getElementById('f-status').value;
+  const lob    = document.getElementById('f-lob').value;
+  const search = document.getElementById('f-search').value.toLowerCase();
+
+  filteredAccts = ACCTS.filter(a => {
+    if (status && a.status !== status) return false;
+    if (lob    && a.lob !== lob)       return false;
+    if (search && !a.name.toLowerCase().includes(search) && !a.id.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  currentPage = 1;
+  renderAccountTable();
+  updateKPIs();
+}
+
+function resetFilters() {
+  document.getElementById('f-object').value = '';
+  document.getElementById('f-status').value = '';
+  document.getElementById('f-lob').value    = '';
+  document.getElementById('f-search').value = '';
+  filteredAccts = [...ACCTS];
+  currentPage = 1;
+  renderAccountTable();
+  updateKPIs();
+}
+
+function filterByStatus(status) {
+  document.getElementById('f-status').value = status;
+  applyFilters();
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const matched  = filteredAccts.filter(a => a.status === 'Matched').length;
+  const partial  = filteredAccts.filter(a => a.status === 'Partial').length;
+  const orphan   = filteredAccts.filter(a => a.status === 'Orphan').length;
+  const total    = filteredAccts.length;
+  const pct      = total ? ((matched/total)*100).toFixed(1) : '0.0';
+
+  document.getElementById('k-total').textContent   = total.toLocaleString();
+  document.getElementById('k-matched').textContent = matched.toLocaleString();
+  document.getElementById('k-partial').textContent = partial.toLocaleString();
+  document.getElementById('k-orphan').textContent  = orphan.toLocaleString();
+  document.getElementById('k-mpct').textContent    = pct + '%';
+  document.getElementById('orphan-badge').textContent = orphan;
+}
+
+// ── OBJECT CARDS ─────────────────────────────────────────────────────────────
+function renderObjCards() {
+  const el = document.getElementById('obj-cards');
+  el.innerHTML = OBJ_DATA.map(o => {
+    const pctColor = o.pct >= 80 ? '#16A34A' : o.pct >= 60 ? '#D97706' : '#DC2626';
+    const pctBg    = o.pct >= 80 ? '#DCFCE7' : o.pct >= 60 ? '#FEF3C7' : '#FEE2E2';
+    return `<div class="oc" onclick="filterByObject('${o.name}')">
+      <div class="oi">${o.icon}</div>
+      <div class="on">${o.name}</div>
+      <div class="ov">${o.records.toLocaleString()}</div>
+      <div class="om">${o.matched.toLocaleString()} of ${o.total.toLocaleString()} accts</div>
+      <span class="op" style="background:${pctBg};color:${pctColor};">${o.pct}% match</span>
+    </div>`;
+  }).join('');
+}
+
+function filterByObject(name) {
+  document.getElementById('f-object').value = name;
+  applyFilters();
+}
+
+// ── MATCH RATE TABLE ──────────────────────────────────────────────────────────
+function renderMatchTable() {
+  const tbody = document.getElementById('match-tbody');
+  tbody.innerHTML = OBJ_DATA.map(o => {
+    const orphan = o.total - o.matched;
+    const pctColor = o.pct >= 80 ? '#16A34A' : o.pct >= 60 ? '#D97706' : '#DC2626';
+    return `<tr>
+      <td class="fw">${o.icon} ${o.name}</td>
+      <td>${o.records.toLocaleString()}</td>
+      <td>${o.matched.toLocaleString()}</td>
+      <td>
+        <div class="pct-wrap">
+          <div class="pct-bar"><div class="pct-fill" style="width:${o.pct}%;background:${pctColor};"></div></div>
+          <span class="pct-n" style="color:${pctColor};">${o.pct}%</span>
+        </div>
+      </td>
+      <td><span class="tag ${orphan > 400 ? 't-r' : orphan > 200 ? 't-a' : 't-n'}">${orphan}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── ACCOUNT TABLE ─────────────────────────────────────────────────────────────
+function renderAccountTable() {
+  const tbody = document.getElementById('acct-tbody');
+  const total = filteredAccts.length;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end   = Math.min(start + PAGE_SIZE, total);
+  const slice = filteredAccts.slice(start, end);
+
+  document.getElementById('acct-count').textContent = `(${total} accounts)`;
+
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="11" class="nodata">No accounts match the current filters.</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(a => {
+      const scCol = a.score >= 70 ? '#10B981' : a.score >= 40 ? '#F59E0B' : '#ED1D24';
+      const lobClass = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'}[a.lob] || '';
+      const stClass  = {Matched:'c-m',Partial:'c-p',Orphan:'c-o'}[a.status] || '';
+      return `<tr>
+        <td class="mono">${a.id}</td>
+        <td class="fw">${a.name}</td>
+        <td><span class="chip ${lobClass}">${a.lob}</span></td>
+        <td>${a.contacts}</td><td>${a.opps}</td><td>${a.cases}</td>
+        <td>${a.contracts}</td><td>${a.tasks}</td>
+        <td><span class="chip ${stClass}">${a.status}</span></td>
+        <td>
+          <div class="score-row">
+            <div class="score-bar"><div class="sb-fill" style="width:${a.score}%;background:${scCol};"></div></div>
+            <span class="score-n" style="color:${scCol};">${a.score}</span>
+          </div>
+        </td>
+        <td><button class="pa" onclick="viewProfile('${a.name}')">View →</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  renderPagination('pgn-info','pgn-btns', total, currentPage, (p) => { currentPage = p; renderAccountTable(); });
+}
+
+// ── PAGINATION ────────────────────────────────────────────────────────────────
+function renderPagination(infoId, btnsId, total, current, callback) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById(infoId).textContent =
+    `Showing ${Math.min((current-1)*PAGE_SIZE+1, total)}–${Math.min(current*PAGE_SIZE, total)} of ${total}`;
+
+  const btns = document.getElementById(btnsId);
+  let html = `<div class="pb" onclick="(${callback.toString()})(${current-1})" ${current===1?'style="opacity:.4;pointer-events:none;"':''}>‹</div>`;
+  const range = pagRange(current, pages);
+  range.forEach(p => {
+    if (p === '…') html += `<div class="pb" style="pointer-events:none;">…</div>`;
+    else html += `<div class="pb ${p===current?'act':''}" onclick="(${callback.toString()})(${p})">${p}</div>`;
+  });
+  html += `<div class="pb" onclick="(${callback.toString()})(${current+1})" ${current===pages?'style="opacity:.4;pointer-events:none;"':''}>›</div>`;
+  btns.innerHTML = html;
+}
+
+function pagRange(current, pages) {
+  if (pages <= 7) return Array.from({length:pages},(_,i)=>i+1);
+  const r = [1];
+  if (current > 3) r.push('…');
+  for (let i = Math.max(2,current-1); i <= Math.min(pages-1,current+1); i++) r.push(i);
+  if (current < pages-2) r.push('…');
+  r.push(pages);
+  return r;
+}
+
+// ── MATRIX ────────────────────────────────────────────────────────────────────
+function renderMatrix() {
+  const tbody = document.getElementById('matrix-tbody');
+  const start = (matrixPage - 1) * PAGE_SIZE;
+  const slice = ACCTS.slice(start, start + PAGE_SIZE);
+  const lobClass = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'};
+
+  tbody.innerHTML = slice.map(a => {
+    const vals = [a.contacts, a.opps, a.cases, a.contracts, a.tasks,
+      Math.floor(Math.random()*10), Math.floor(Math.random()*5)];
+    const total = vals.reduce((s,v) => s+v, 0);
+    const cells = vals.map(v => {
+      const cls = v === 0 ? 'mn' : v <= 2 ? 'mm' : 'mh';
+      return `<td class="${cls}">${v}</td>`;
+    }).join('');
+    return `<tr>
+      <td class="mname">${a.name}</td>
+      <td><span class="chip ${lobClass[a.lob]||''}">${a.lob}</span></td>
+      ${cells}
+      <td style="font-weight:700;">${total}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('matrix-pgn-info','matrix-pgn-btns', ACCTS.length, matrixPage,
+    (p) => { matrixPage = p; renderMatrix(); });
+}
+
+// ── ORPHANS ───────────────────────────────────────────────────────────────────
+function renderOrphans() {
+  const orphans = ACCTS.filter(a => a.status === 'Orphan');
+  const tbody = document.getElementById('orphan-tbody');
+  const lobClass = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'};
+
+  tbody.innerHTML = orphans.map(a => `<tr>
+    <td class="mono">${a.id}</td>
+    <td class="fw">${a.name}</td>
+    <td><span class="chip ${lobClass[a.lob]||''}">${a.lob}</span></td>
+    <td>Commercial</td>
+    <td>Jan 15, 2025</td>
+    <td>Unassigned</td>
+    <td><span class="tag t-r">Investigate &amp; Assign</span></td>
+  </tr>`).join('');
+}
+
+// ── PROFILE LIST ──────────────────────────────────────────────────────────────
+function renderProfileList(filter = '') {
+  const el = document.getElementById('profile-list');
+  const list = ACCTS.filter(a => !filter || a.name.toLowerCase().includes(filter.toLowerCase()));
+  el.innerHTML = list.map(a => {
+    const scCol = a.score >= 70 ? '#10B981' : a.score >= 40 ? '#F59E0B' : '#ED1D24';
+    const lobClass = {SBB:'lob-sbb',SBCAT:'lob-sc',Treasury:'lob-tr','CIE LOD':'lob-ci'}[a.lob] || '';
+    return `<div onclick="viewProfile('${a.name}')"
+      style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px;"
+      onmouseover="this.style.background='#F8FAFF'" onmouseout="this.style.background=''">
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:600;color:var(--dark);">${a.name}</div>
+        <div style="font-size:11px;color:var(--muted);">${a.id}</div>
+      </div>
+      <span class="chip ${lobClass}">${a.lob}</span>
+      <span style="font-size:13px;font-weight:800;color:${scCol};">${a.score}</span>
+    </div>`;
+  }).join('') || '<div class="nodata">No accounts found.</div>';
+}
+
+function filterProfileList() {
+  renderProfileList(document.getElementById('profile-search').value);
+}
+
+function viewProfile(name) {
+  const a = ACCTS.find(x => x.name === name);
+  if (!a) return;
+  const scCol = a.score >= 70 ? '#10B981' : a.score >= 40 ? '#F59E0B' : '#ED1D24';
+  document.getElementById('profile-detail').innerHTML = `
+    <div class="ph"><h4>📋 ${a.name}</h4><span class="mono">${a.id}</span></div>
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
+      <div class="kpi k-g" style="padding:12px;"><div class="lbl">Quality Score</div><div class="val" style="color:${scCol};">${a.score}</div></div>
+      <div class="kpi k-b" style="padding:12px;"><div class="lbl">LOB</div><div class="val" style="font-size:16px;">${a.lob}</div></div>
+      <div class="kpi k-${a.status==='Matched'?'g':a.status==='Partial'?'a':'r'}" style="padding:12px;"><div class="lbl">Match Status</div><div class="val" style="font-size:16px;">${a.status}</div></div>
+    </div>
+    <table class="dt" style="font-size:12px;">
+      <thead><tr><th>Child Object</th><th>Record Count</th><th>Coverage</th></tr></thead>
+      <tbody>
+        <tr><td>Contact</td><td>${a.contacts}</td><td>${a.contacts > 0 ? '<span class="tag t-g">Present</span>' : '<span class="tag t-r">Missing</span>'}</td></tr>
+        <tr><td>Opportunity</td><td>${a.opps}</td><td>${a.opps > 0 ? '<span class="tag t-g">Present</span>' : '<span class="tag t-r">Missing</span>'}</td></tr>
+        <tr><td>Case</td><td>${a.cases}</td><td>${a.cases > 0 ? '<span class="tag t-g">Present</span>' : '<span class="tag t-r">Missing</span>'}</td></tr>
+        <tr><td>Contract</td><td>${a.contracts}</td><td>${a.contracts > 0 ? '<span class="tag t-g">Present</span>' : '<span class="tag t-r">Missing</span>'}</td></tr>
+        <tr><td>Task</td><td>${a.tasks}</td><td>${a.tasks > 0 ? '<span class="tag t-g">Present</span>' : '<span class="tag t-r">Missing</span>'}</td></tr>
+      </tbody>
+    </table>`;
+  // Switch to profile tab
+  switchTab(document.querySelector('[data-tab=profiles]'), 'profiles');
+}
+
+// ── TIMELINE ──────────────────────────────────────────────────────────────────
+function renderTimeline() {
+  const sel = document.getElementById('tl-account').value;
+  const events = TL_EVENTS[sel] || TL_EVENTS.default;
+  const body = document.getElementById('timeline-body');
+  body.innerHTML = events.map(e => `
+    <div class="tl-item">
+      <div class="tl-dot" style="background:${e.color};"></div>
+      <div class="tl-box">
+        <div class="tl-type" style="color:${e.color};">${e.type}</div>
+        <div class="tl-name">${e.name}</div>
+        <div class="tl-date">${e.date}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── DELTA ─────────────────────────────────────────────────────────────────────
+function renderDelta() {
+  const tbody = document.getElementById('delta-tbody');
+  tbody.innerHTML = DELTA_DATA.map(d => `<tr>
+    <td class="fw">${d.obj}</td>
+    <td style="color:#16A34A;font-weight:700;">+${d.added}</td>
+    <td style="color:#D97706;font-weight:700;">${d.modified}</td>
+    <td style="color:#DC2626;font-weight:700;">${d.removed > 0 ? '-' : ''}${Math.abs(d.removed)}</td>
+    <td><span class="tag ${d.net > 0 ? 't-g' : 't-r'}">${d.net > 0 ? '▲' : '▼'} ${Math.abs(d.net)}</span></td>
+    <td style="color:var(--muted);font-size:11px;">${d.date}</td>
+  </tr>`).join('');
+}
+
+// ── TABLE SORT ────────────────────────────────────────────────────────────────
+function sortTable(tableId, col) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector('tbody');
+  const rows  = Array.from(tbody.querySelectorAll('tr'));
+  const th    = table.querySelectorAll('th')[col];
+  const asc   = !th.classList.contains('asc');
+
+  table.querySelectorAll('th').forEach(t => t.classList.remove('asc','desc'));
+  th.classList.add(asc ? 'asc' : 'desc');
+
+  rows.sort((a, b) => {
+    const av = a.cells[col]?.textContent.trim() || '';
+    const bv = b.cells[col]?.textContent.trim() || '';
+    const an = parseFloat(av.replace(/[^0-9.\-]/g,''));
+    const bn = parseFloat(bv.replace(/[^0-9.\-]/g,''));
+    if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+    return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const headers = ['AccountId','AccountName','LOB','Contacts','Opportunities','Cases','Contracts','Tasks','Status','QualityScore'];
+  const rows = filteredAccts.map(a =>
+    [a.id, `"${a.name}"`, a.lob, a.contacts, a.opps, a.cases, a.contracts, a.tasks, a.status, a.score].join(',')
+  );
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = 'POC_Child_Records_Match.csv';
+  link.click(); URL.revokeObjectURL(url);
+}
+
+function printPage() { window.print(); }
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderObjCards();
+  renderMatchTable();
+  renderAccountTable();
+  renderDelta();
+  renderTimeline();
+  updateKPIs();
+  document.getElementById('refresh-stamp').textContent =
+    'Last refresh: ' + new Date().toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+});
+</script>
+
+</body>
+</html>

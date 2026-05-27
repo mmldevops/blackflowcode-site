@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task 2 Job Aide — POC Child Records Match</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;}
+header{background:var(--dark);color:#fff;padding:14px 22px;border-bottom:3px solid var(--red);position:sticky;top:0;z-index:20;}
+header .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+header .mark{width:30px;height:30px;background:var(--red);border-radius:6px;display:grid;place-items:center;font-weight:900;}
+header h1{font-size:14px;font-weight:700;}
+header a{color:#93C5FD;font-size:12px;margin-left:auto;}
+nav{background:var(--white);border-bottom:1px solid var(--border);padding:10px 22px;display:flex;gap:12px;flex-wrap:wrap;position:sticky;top:51px;z-index:19;font-size:12px;}
+nav a{color:var(--blue);font-weight:600;text-decoration:none;}
+nav a:hover{text-decoration:underline;}
+main{max-width:1040px;margin:0 auto;padding:26px 22px 50px;}
+h2{font-size:17px;color:var(--dark);margin:28px 0 10px;border-bottom:2px solid var(--border);padding-bottom:6px;}
+h3{font-size:14px;margin:16px 0 8px;}
+p,li{color:var(--muted);margin:6px 0;}
+ul{margin:6px 0 10px 18px;}
+pre{background:#1E1E2E;color:#CDD6F4;padding:14px 16px;border-radius:8px;overflow-x:auto;font-size:12px;line-height:1.5;margin:10px 0;}
+table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);font-size:12px;margin:10px 0;}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
+th{background:var(--dark);color:#fff;}
+tr:last-child td{border-bottom:none;}
+.links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;}
+.links a{display:inline-block;padding:6px 12px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:12px;font-weight:600;color:var(--blue);text-decoration:none;}
+.links a:hover{border-color:var(--blue);}
+button.dl{background:var(--dark);color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;}
+button.dl:hover{opacity:.92;}
+.note{border-left:4px solid var(--red);padding:10px 14px;background:var(--white);border:1px solid var(--border);margin:12px 0;font-size:13px;}
+.asset-dock{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:18px;margin-top:8px;}
+.asset-dock>h3{font-size:15px;color:var(--dark);margin-bottom:6px;}
+.asset-dock>.sub{font-size:12px;color:var(--muted);margin-bottom:4px;}
+.asset-tabrow{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--border);margin-top:12px;}
+.asset-tab{padding:10px 14px;font-size:12px;font-weight:600;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;border-radius:6px 6px 0 0;}
+.asset-tab:hover{color:var(--text);background:var(--bg);}
+.asset-tab.active{color:var(--red);border-bottom-color:var(--red);background:var(--bg);}
+.asset-pane{display:none;padding:14px 2px 4px;}
+.asset-pane.active{display:block;}
+.asset-pane .fname{font-size:11px;font-weight:700;color:var(--dark);font-family:'Cascadia Code','Consolas',monospace;margin-bottom:8px;}
+.asset-pane p{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.5;}
+button.dl{background:var(--dark);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;}
+button.dl:hover{opacity:.92;}
+button.dl.sec{background:var(--white);color:var(--dark);border:1px solid var(--border);}
+button.dl.sec:hover{border-color:var(--blue);color:var(--blue);}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="mark">2</div>
+    <h1>Task 2 — End-to-end job aide · Salesforce Child Records Match (POC)</h1>
+    <a href="../job-aide-hub.html">Hub</a>
+  </div>
+</header>
+<nav>
+  <a href="#model">Data model</a>
+  <a href="#pages">Report pages</a>
+  <a href="#soql">SOQL patterns</a>
+  <a href="#m">M query library</a>
+  <a href="#assets">Downloads</a>
+</nav>
+<main>
+
+  <div class="links">
+    <a href="bfc-doc-p2.html">bfc-doc-p2 — Phase 2 vertical slice</a>
+    <a href="bfc-best-va.html">bfc-best-va — Data &amp; BI excellence</a>
+    <a href="../enhancements.html">Recommended enhancements</a>
+    <a href="brand-guidelines-power-bi-td-child-match.html">Brand guidelines</a>
+    <a href="../queries-job-aide.html">500 M queries (open Task 2 tab)</a>
+    <a href="../task2-dashboard.html">HTML mockup</a>
+  </div>
+
+  <section id="model">
+    <h2>Data model (conceptual)</h2>
+    <p><strong>POC Master</strong> is the driving list: one row per proof account. Required logical columns: <code>SID</code> (Salesforce Account Id, 15 or 18 chars) and <code>POC_Record_Name</code> (human label for slicers and drillthrough titles). In Power Query, rename your workbook columns to match or build a mapping step.</p>
+    <div class="note">Treat <code>SID</code> as the only join key to Salesforce for Task 2. All child queries should filter to the POC Id set (batched) and attach <code>POC_Record_Name</code> after the fact with a merge from POC Master.</div>
+    <h3>End-to-end flow</h3>
+<pre>
+[POC Master Records] (Excel / SharePoint)
+        |  SID validated + deduped
+        v
+Power Query: POC_AccountIds  ---------------------------+
+        |                                                |
+        v                                                v
+M: OAuth token (cached)                         M: per-object SOQL
+        |                                        (IN batches, paginated)
+        v                                                |
+ REST query/?q=...                                      v
+        |                                    Staging tables per object
+        +----------------------&gt; Model: relationships SID → child.AccountId / WhatId / ParentId
+                                              |
+                                              v
+                                   Measures: match rate, orphans, API health
+</pre>
+  </section>
+
+  <section id="pages">
+    <h2>Report pages (build order)</h2>
+    <table>
+      <thead>
+        <tr><th>Page</th><th>Audience</th><th>Primary visuals</th><th>Build notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0 · Technical setup</td><td>Developer</td><td>Parameter table, gateway notes, last error text</td><td>Hidden from business nav; link from footer only.</td></tr>
+        <tr><td>1 · Executive summary</td><td>Management</td><td>Six KPIs, match-rate bar by object, orphan count trend</td><td>Follow brand KPI row; no raw Ids in charts.</td></tr>
+        <tr><td>2 · Object coverage matrix</td><td>Analyst</td><td>Matrix: POC rows × object columns = count or matched flag</td><td>Conditional formatting from brand guidelines.</td></tr>
+        <tr><td>3 · Object deep-dive</td><td>Analyst</td><td>Slicer: object, table of matches, SOQL length diagnostic</td><td>One page template duplicated via bookmark or field parameter if needed.</td></tr>
+        <tr><td>4 · Account drillthrough</td><td>Analyst</td><td>Header shows POC_Record_Name + SID; per-object child tables</td><td>Drillthrough from matrix on SID.</td></tr>
+        <tr><td>5 · Orphans and gaps</td><td>Data steward</td><td>Table of SIDs with zero children; export enabled</td><td>Define “in scope” object list explicitly in a DAX measure to avoid false orphans.</td></tr>
+        <tr><td>6 · API and refresh health</td><td>Ops</td><td>429/401 counts, duration by query, token age</td><td>Populate from logged error table in M.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="soql">
+    <h2>SOQL patterns (Account-scoped)</h2>
+    <p>Replace <code>{IDLIST}</code> with a comma-separated quoted Id list from each batch. Confirm the anchor field per object using <code>child-objects-catalog.csv</code> from the hub.</p>
+    <h3>Standard child (AccountId)</h3>
+<pre>SELECT Id, AccountId, Name
+FROM Contact
+WHERE AccountId IN ({IDLIST})</pre>
+    <h3>Activity (polymorphic WhatId)</h3>
+<pre>SELECT Id, Subject, ActivityDate, WhatId
+FROM Task
+WHERE WhatId IN ({IDLIST})</pre>
+    <h3>Notes (polymorphic ParentId)</h3>
+<pre>SELECT Id, Title, ParentId, CreatedDate
+FROM Note
+WHERE ParentId IN ({IDLIST})</pre>
+    <h3>FeedItem (Account posts)</h3>
+<pre>SELECT Id, ParentId, Type, CreatedDate
+FROM FeedItem
+WHERE ParentId IN ({IDLIST})</pre>
+    <p style="font-size:12px;">Custom objects: use the confirmed lookup API name, for example <code>WHERE Loan_Account__c IN ({IDLIST})</code> once verified in Object Manager.</p>
+  </section>
+
+  <section id="m">
+    <h2>M query library cross-reference</h2>
+    <p>The file <a href="../queries-job-aide.html"><code>queries-job-aide.html</code></a> contains numbered patterns. For Task 2, prioritize queries in ranges <strong>201–240</strong> (auth and REST), <strong>241–280</strong> (chunking and POC load — align column names with <code>SID</code>), <strong>281–340</strong> (child pulls), and <strong>341–400</strong> (deltas and quality).</p>
+    <p>Update any sample that still references <code>AccountId</code> alone in the POC sheet to your real headers: keep a single <code>RenameColumns</code> step at the start of POC load so the rest of the model stays stable.</p>
+  </section>
+
+  <section id="assets">
+    <h2>Downloadable assets</h2>
+    <div class="asset-dock" id="asset-dock">
+      <h3>Files for this POC</h3>
+      <p class="sub">Choose a tab, then download. Same files as <code>guides/assets/</code> and the hub. Works offline.</p>
+      <div class="asset-tabrow" role="tablist" aria-label="Asset downloads">
+        <button type="button" class="asset-tab active" role="tab" aria-selected="true" data-tab="poc">POC template</button>
+        <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="child">Child catalog</button>
+        <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="brand">Brand tokens</button>
+        <button type="button" class="asset-tab" role="tab" aria-selected="false" data-tab="check">Build checklist</button>
+      </div>
+      <div class="asset-panes">
+        <div class="asset-pane active" data-panel="poc" role="tabpanel">
+          <div class="fname">poc-master-template.csv</div>
+          <p>Starter columns <code>SID</code> and <code>POC_Record_Name</code> aligned to <strong>[POC Master Records]</strong>.</p>
+          <button type="button" class="dl" data-asset="poc">Download CSV</button>
+        </div>
+        <div class="asset-pane" data-panel="child" role="tabpanel">
+          <div class="fname">child-objects-catalog.csv</div>
+          <p>Objects, suggested API names, and anchor patterns for SOQL and Power Query.</p>
+          <button type="button" class="dl" data-asset="child">Download CSV</button>
+        </div>
+        <div class="asset-pane" data-panel="brand" role="tabpanel">
+          <div class="fname">brand-tokens.json</div>
+          <p>Theme-oriented color and type tokens for Power BI.</p>
+          <button type="button" class="dl sec" data-asset="brand">Download JSON</button>
+        </div>
+        <div class="asset-pane" data-panel="check" role="tabpanel">
+          <div class="fname">mid-review-build-checklist.txt</div>
+          <p>Mid-review readiness: Task 2 items first, then Task 1 and shared checks.</p>
+          <button type="button" class="dl sec" data-asset="check">Download TXT</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<script id="csv-child" type="text/plain">
+object_label,suggested_api_name,anchor_field,pattern_notes,verify_in_org
+Account,Account,Id,POC SID joins to Account.Id; use for labels and hierarchy,true
+Account Campaign Association,Account_Campaign_Association__c,Account__c_or_AccountId,Confirm actual relationship field name in Object Manager,true
+AccountContactRole,AccountContactRole,AccountId,Standard junction to Contact,true
+AccountFeed,AccountFeed,ParentId,Chatter feed for Account; high volume — consider date filter,true
+AccountHistory,AccountHistory,AccountId,Field history; can be large — filter by date if allowed,true
+AccountShare,AccountShare,AccountId,Sharing rows; usually admin-only visibility in reports — confirm REST access,false
+AccountTeamMember,AccountTeamMember,AccountId,Team members tied to Account,true
+Address,Address__c,Parent_Account_or_Account__c,Confirm lookup API name on custom object,true
+Borrower Risk Rating,Borrower_Risk_Rating__c,Account__c,Confirm lookup API name,true
+Contact,Contact,AccountId,Primary child for most POCs,true
+Covid Customer Relief Tracker,Covid_Customer_Relief_Tracker__c,Account__c,Confirm lookup API name,true
+Credit Memo Narrative,Credit_Memo_Narrative__c,Account__c,Confirm lookup API name,true
+Event,Event,WhatId_or_AccountId,Often WhatId = Account Id; validate in your org,true
+FeedItem,FeedItem,ParentId,Polymorphic parent; filter Parent.Type = 'Account' and ParentId IN POC set,true
+Field History,Field_History__c,Account__c,Confirm lookup API name,true
+Lead,Lead,ConvertedAccountId_or_none,Optional — use ConvertedAccountId if available,false
+LLC BI Account Collateral,LLC_BI__Account_Collateral__c,LLC_BI__Account__c_or_Account__c,Confirm package namespace and lookup,true
+LLC BI Account Covenant,LLC_BI__Account_Covenant__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Account Document,LLC_BI__AccountDocument__c,LLC_BI__Account__c_or_Account__c,Confirm lookup API name,true
+LLC BI Connection,LLC_BI__Connection__c,From_Account__c_To_Account__c,Decide which side matches POC SID,true
+LLC BI Covenant2,LLC_BI__Covenant2__c,Account_or_Loan_lookup,Confirm parent object for covenant row,true
+LLC BI Loan,LLC_BI__Loan__c,LLC_BI__Account__c,Confirm field name,true
+Loan Application,Loan_Application__c,Account__c,Confirm lookup API name,true
+Loan Clone,Loan_Clone__c,Account__c,Confirm lookup API name,true
+Note,Note,ParentId,Polymorphic — filter ParentId IN POC Account Ids and IsDeleted=false,true
+Opportunity,Opportunity,AccountId,Standard child of Account,true
+PLNDR RA PL Relationship Details,PLNDR_RA_PL_Relationship_Details__c,Account__c,Verify spelling in org,true
+Relationship Planning,Relationship_Planning__c,Account__c,Confirm lookup API name,true
+Requests,Requests__c,Account__c,Confirm lookup API name,true
+Task,Task,WhatId_or_AccountId,Validate which field your org populates for Account-linked tasks,true
+TM CDD Onboarding,TM_CDD_Onboarding__c,Account__c,Confirm lookup API name,true
+</script>
+<script id="txt-check" type="text/plain">
+Mid-review build checklist — TD Banking Intelligence Suite
+Date target: May 26, 2026
+
+Task 2 — POC Child Records Match (build first)
+[ ] POC Master spreadsheet uses columns SID and POC_Record_Name (or mapped in Power Query)
+[ ] All Account Ids normalized: trim, upper, validate length 15 or 18
+[ ] OAuth token in a single cached query (gateway credentials for secrets)
+[ ] SOQL IN batches capped at ~200 Ids per request; union results
+[ ] Pagination implemented for objects returning >2000 rows
+[ ] Match-rate KPI per in-scope child object
+[ ] Orphan page: POC accounts with zero related rows across objects
+[ ] Refresh failure UX: try/otherwise with logged error table
+
+Task 1 — User dashboard
+[ ] RLS roles tested per LOB (SBB, SBCAT, Treasury, CIE LOD)
+[ ] Report CSVs versioned or latest file pattern documented
+[ ] Executive summary page + phone layout smoke test
+
+Shared
+[ ] Theme JSON applied from brand tokens; semantic colors for good/warn/bad
+[ ] No secrets in M code; gateway or dataset credentials only
+</script>
+<script>
+(function(){
+  const brandJson = JSON.stringify({
+    name: "Blackflow Cloud / TD Banking — Power BI",
+    colors: {
+      brandRed: "#ED1D24", brandDark: "#1A1A2E", brandBlue: "#0066CC",
+      pageBackground: "#F4F5F7", surface: "#FFFFFF", border: "#E0E4EC",
+      textPrimary: "#2C2C3E", textMuted: "#6B7280", success: "#10B981",
+      warning: "#F59E0B", accentPurple: "#7C3AED"
+    },
+    typography: {
+      fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
+      titleReport: "20pt semibold", pageTitle: "14pt bold", body: "10–11pt", dataLabels: "9pt"
+    },
+    layout: { canvasMaxWidthPx: 1440, gridMarginPx: 16, kpiMinHeightPx: 72 }
+  }, null, 2);
+  const poc = "SID,POC_Record_Name\n001000000000000AAA,Replace with your POC label\n001000000000001AAA,Second example row\n";
+  var elC = document.getElementById('csv-child');
+  var elT = document.getElementById('txt-check');
+  const child = elC ? elC.textContent.trim() : '';
+  const check = elT ? elT.textContent.trim() : '';
+  const map = { poc: poc, child: child, brand: brandJson, check: check };
+  const names = { poc: 'poc-master-template.csv', child: 'child-objects-catalog.csv', brand: 'brand-tokens.json', check: 'mid-review-build-checklist.txt' };
+  var dock = document.getElementById('asset-dock');
+  function downloadKey(k) {
+    var body = map[k];
+    if (!body) return;
+    var mime = k === 'brand' ? 'application/json' : k === 'child' || k === 'poc' ? 'text/csv' : 'text/plain';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], { type: mime + ';charset=utf-8' }));
+    a.download = names[k];
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  if (dock) {
+    dock.addEventListener('click', function(ev) {
+      var tab = ev.target.closest('.asset-tab');
+      if (tab && dock.contains(tab)) {
+        var id = tab.getAttribute('data-tab');
+        dock.querySelectorAll('.asset-tab').forEach(function(t) {
+          t.classList.toggle('active', t === tab);
+          t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+        });
+        dock.querySelectorAll('.asset-pane').forEach(function(p) {
+          p.classList.toggle('active', p.getAttribute('data-panel') === id);
+        });
+        return;
+      }
+      var btn = ev.target.closest('button.dl[data-asset]');
+      if (btn && dock.contains(btn)) downloadKey(btn.getAttribute('data-asset'));
+    });
+  }
+})();
+</script>
+</body>
+</html>

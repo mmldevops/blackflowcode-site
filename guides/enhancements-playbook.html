@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enhancements Playbook — TD Banking Intelligence Suite</title>
+<style>
+:root{--red:#ED1D24;--dark:#1A1A2E;--blue:#0066CC;--bg:#F4F5F7;--white:#fff;--border:#E0E4EC;--text:#2C2C3E;--muted:#6B7280;--green:#10B981;--amber:#F59E0B;--shadow:0 2px 12px rgba(0,0,0,.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:14px;}
+nav{background:var(--white);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;font-size:12px;position:sticky;top:0;z-index:30;}
+nav .nh{color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:10px;}
+nav a{color:var(--blue);font-weight:600;text-decoration:none;}
+nav a:hover{text-decoration:underline;}
+header{background:var(--dark);color:#fff;padding:18px 28px;border-bottom:3px solid var(--red);}
+header h1{font-size:16px;font-weight:800;}
+header p{font-size:12px;color:#94A3B8;margin-top:6px;max-width:720px;}
+.badge{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:14px;margin-top:10px;letter-spacing:.04em;}
+main{max-width:980px;margin:0 auto;padding:28px 24px 56px;}
+h2{font-size:17px;color:var(--dark);margin:32px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--border);}
+h2:first-of-type{margin-top:0;}
+h3{font-size:14px;color:var(--dark);margin:18px 0 8px;}
+p,li{color:var(--muted);margin:8px 0;font-size:13px;}
+ul{padding-left:20px;}
+.callout{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--red);border-radius:10px;padding:16px 18px;margin:16px 0;box-shadow:var(--shadow);}
+.callout strong{color:var(--dark);}
+table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:14px 0;font-size:12px;box-shadow:var(--shadow);}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top;}
+th{background:var(--dark);color:#fff;font-weight:600;}
+tr:last-child td{border-bottom:none;}
+.pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;margin-right:4px;}
+.p-t2{background:#DBEAFE;color:#1D4ED8;}
+.p-t1{background:#DCFCE7;color:#166534;}
+.p-both{background:#F3E8FF;color:#6D28D9;}
+.phase{display:grid;gap:14px;margin-top:12px;}
+@media(min-width:720px){.phase{grid-template-columns:1fr 1fr;}}
+.ph{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px;box-shadow:var(--shadow);}
+.ph h4{font-size:13px;font-weight:800;color:var(--dark);margin-bottom:8px;}
+.ph ul{margin:0;padding-left:18px;}
+.ph li{margin:5px 0;}
+footer{text-align:center;padding:20px;font-size:11px;color:var(--muted);border-top:1px solid var(--border);margin-top:40px;}
+footer a{color:var(--blue);font-weight:600;}
+</style>
+</head>
+<body>
+<nav aria-label="Related guides">
+  <span class="nh">Navigate</span>
+  <a href="../job-aide-hub.html">Hub</a>
+  <a href="../enhancements.html">Enhancements (full catalog)</a>
+  <a href="task2-child-records-match-job-aide.html">Task 2 job aide</a>
+  <a href="bfc-doc-p2.html">bfc-doc-p2 (Phase 2)</a>
+  <a href="bfc-doc-j1.html">bfc-doc-j1</a>
+  <a href="bfc-best-va.html">bfc-best-va</a>
+  <a href="../queries-job-aide.html">M query library</a>
+</nav>
+<header>
+  <h1>Enhancements playbook</h1>
+  <p>How to turn the full enhancement catalog into a controlled build and a credible mid-review story. Use this page for sequencing, ownership, and outcomes; use <a href="../enhancements.html" style="color:#93C5FD;">enhancements.html</a> for the detailed card list, POC schema, child-object matrix, downloads, and connection templates.</p>
+  <span class="badge">Companion to enhancements.html · Mid-review May 26, 2026</span>
+</header>
+<main>
+
+  <div class="callout">
+    <strong>Two documents, one workflow.</strong> Treat <code>enhancements.html</code> as the backlog and evidence catalog. Treat this playbook as the operating guide: what to do first, who cares, and how you will prove value in the review without boiling the ocean.
+  </div>
+
+  <h2>1. Guiding principles</h2>
+  <ul>
+    <li><strong>Task 2 first:</strong> prove POC Master to child-record coverage before polishing Task 1 executive chrome.</li>
+    <li><strong>No new Salesforce fields:</strong> every enhancement must be achievable with reports, REST, and Power BI model design only.</li>
+    <li><strong>Three demo-ready outcomes:</strong> match rate by object, orphan list, and one governance view for Task 1 (for example permission drift or RLS proof).</li>
+    <li><strong>Stop on green:</strong> if refresh is stable and match KPIs render, defer nice-to-have visuals rather than risking the demo.</li>
+  </ul>
+
+  <h2>2. Phased plan (suggested)</h2>
+  <div class="phase">
+    <div class="ph">
+      <h4>Phase A — Freeze scope (half day)</h4>
+      <ul>
+        <li>Lock POC Master columns: <code>SID</code>, <code>POC_Record_Name</code>.</li>
+        <li>Confirm in-scope child objects from the catalog in enhancements (verify API names in org).</li>
+        <li>Pick three Task 2 enhancements marked Critical in the catalog (chunking, ID normalization, match scorecard).</li>
+        <li>Pick two Task 1 enhancements for the review (for example RLS + one matrix or drift view).</li>
+      </ul>
+    </div>
+    <div class="ph">
+      <h4>Phase B — Vertical slice (Task 2)</h4>
+      <ul>
+        <li>OAuth cached once; SOQL batched; pagination on at least one heavy object.</li>
+        <li>Executive summary page: POC count, objects loaded, overall match rate, orphan count, refresh status.</li>
+        <li>Exportable orphan table for stewards.</li>
+        <li><strong>Detailed guide:</strong> <a href="bfc-doc-p2.html">bfc-doc-p2 — Phase 2</a> (workstreams, checkpoints, exit checklist).</li>
+      </ul>
+    </div>
+    <div class="ph">
+      <h4>Phase C — Task 1 slice</h4>
+      <ul>
+        <li>RLS roles smoke-tested with View as.</li>
+        <li>One high-signal visual: permission matrix or profile compare or drift.</li>
+        <li>Mobile or PDF path only if time remains.</li>
+      </ul>
+    </div>
+    <div class="ph">
+      <h4>Phase D — Review rehearsal</h4>
+      <ul>
+        <li>Five-minute narrative: problem, data boundaries, live refresh, risks mitigated.</li>
+        <li>Backup static screenshots if gateway or Salesforce is unstable.</li>
+        <li>Capture build checklist from the enhancements download panel.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>3. Outcome map (which audience gets which win)</h2>
+  <table>
+    <thead>
+      <tr><th>Stakeholder</th><th>What they need to hear</th><th>Primary enhancements (see catalog)</th><th>Task</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Data steward</td>
+        <td>Coverage and orphans are measurable and exportable</td>
+        <td>Match rate scorecard, orphan detection, multi-object matrix</td>
+        <td><span class="pill p-t2">T2</span></td>
+      </tr>
+      <tr>
+        <td>Security / compliance</td>
+        <td>Access is bounded and explainable</td>
+        <td>RLS, permission drift, Modify All discovery, audit exports</td>
+        <td><span class="pill p-t1">T1</span></td>
+      </tr>
+      <tr>
+        <td>Engineering lead</td>
+        <td>Refresh will not take down the workspace</td>
+        <td>Chunking, token cache, retry, incremental where licensed</td>
+        <td><span class="pill p-t2">T2</span></td>
+      </tr>
+      <tr>
+        <td>Executive sponsor</td>
+        <td>Cost and risk are visible in one screen</td>
+        <td>License gap, dormant users, executive summary layout</td>
+        <td><span class="pill p-both">Both</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Decision gates (before you add more scope)</h2>
+  <ul>
+    <li><strong>Gate 1 — Data:</strong> Are all POC SIDs valid 15 or 18 characters and deduplicated? If not, stop feature work until fixed.</li>
+    <li><strong>Gate 2 — API:</strong> Does a full refresh finish under the workspace timeout? If not, narrow columns, add incremental, or split staging.</li>
+    <li><strong>Gate 3 — Narrative:</strong> Can you explain each visual in one sentence tied to a risk or KPI? If not, remove the visual from the demo path.</li>
+  </ul>
+
+  <h2>5. Evidence checklist (for mid-review)</h2>
+  <ul>
+    <li>Screenshot or recording of successful scheduled refresh (or gateway test).</li>
+    <li>Table or export of top ten orphan accounts with POC names.</li>
+    <li>One RLS test matrix: role name, test account, expected row count.</li>
+    <li>List of in-scope Salesforce objects with match rate column (even if some are pending).</li>
+  </ul>
+
+  <h2>6. Where to go next</h2>
+  <p>Open the <a href="../enhancements.html">full enhancements catalog</a> for card-level detail, Salesforce report field tables, Task 2 connection steps, and tabbed downloads. Open the <a href="../job-aide-hub.html">hub</a> for brand, job aides, and the M library. For data cleansing, Id normalization, Power Query, DAX, and zero-defect gates, use <a href="bfc-best-va.html">bfc-best-va</a>.</p>
+</main>
+<footer>
+  <p>Blackflow Cloud · TD Banking · <a href="../enhancements.html">enhancements.html</a> (master) · This playbook (companion)</p>
+</footer>
+</body>
+</html>

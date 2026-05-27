@@ -1,0 +1,85 @@
+{
+  "name": "BFC — Signal Deployed → Update Drop Count",
+  "nodes": [
+    {
+      "parameters": {
+        "schema": "public",
+        "tableName": "signals",
+        "events": ["update"]
+      },
+      "name": "Supabase Trigger",
+      "type": "n8n-nodes-base.supabaseTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"new\"][\"status\"]}}",
+              "operation": "equal",
+              "value2": "deployed"
+            }
+          ],
+          "boolean": [
+            {
+              "value1": "={{$json[\"new\"][\"drop_id\"] !== null}}",
+              "operation": "equal",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "IF — status=deployed and drop_id set",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "schema": "public",
+        "tableName": "drops",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{$json[\"new\"][\"drop_id\"]}}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "name": "Supabase — Fetch Drop",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "webhookUri": "={{$env[\"SLACK_WEBHOOK_URL\"]}}",
+        "text": "=Signal deployed: *{{$node[\"Supabase Trigger\"].json[\"new\"][\"title\"]}}* in drop v{{$json[0][\"version\"]}} ({{$json[0][\"deployed_count\"]}}/{{$json[0][\"signal_count\"]}} signals done)"
+      },
+      "name": "Slack — Notify Deployed",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [900, 220]
+    }
+  ],
+  "connections": {
+    "Supabase Trigger": {
+      "main": [[{"node": "IF — status=deployed and drop_id set", "type": "main", "index": 0}]]
+    },
+    "IF — status=deployed and drop_id set": {
+      "main": [[{"node": "Supabase — Fetch Drop", "type": "main", "index": 0}]]
+    },
+    "Supabase — Fetch Drop": {
+      "main": [[{"node": "Slack — Notify Deployed", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "tags": ["bfc-release-tracker"]
+}
