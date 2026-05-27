@@ -17,16 +17,19 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT delivery_method, phone_number FROM user_notification_preferences WHERE user_id = '{{ $json[\"body\"][\"user_id\"] }}'::uuid LIMIT 1;"
+        "query": "SELECT delivery_method, phone_number FROM user_notification_preferences WHERE user_id = NULLIF($1, 'null')::uuid LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.user_id }}"
+        }
       },
       "name": "Postgres — Fetch User Prefs",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
+      "typeVersion": 2.5,
       "position": [470, 300]
     },
     {
       "parameters": {
-        "jsCode": "const prefs = $input.first().json;\nconst wb    = $('Webhook').first().json.body;\n\nreturn [{\n  json: {\n    user_id:         wb.user_id,\n    client_id:       wb.client_id,\n    client_email:    wb.client_email,\n    report_type:     wb.report_type,\n    report_month:    wb.report_month,\n    delivery_method: prefs.delivery_method ?? 'email',\n    phone_number:    prefs.phone_number    ?? null,\n  }\n}];\n"
+        "jsCode": "const prefs = $input.item.json;\nconst wb    = $('Webhook').item.json.body;\n\nreturn [{\n  json: {\n    user_id:         wb.user_id,\n    client_id:       wb.client_id,\n    client_email:    wb.client_email,\n    report_type:     wb.report_type,\n    report_month:    wb.report_month,\n    delivery_method: prefs.delivery_method ?? 'email',\n    phone_number:    prefs.phone_number    ?? null,\n  }\n}];\n"
       },
       "name": "Code — Normalize Data",
       "type": "n8n-nodes-base.code",
@@ -48,7 +51,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data     = $('Code — Normalize Data').first().json;\nconst linkData = $input.first().json;\n\nconst expiresAt = new Date();\nexpiresAt.setMinutes(expiresAt.getMinutes() + 30);\n\nreturn [{\n  json: {\n    ...data,\n    magic_link:            linkData.url   ?? null,\n    magic_link_expires_at: expiresAt.toISOString(),\n  }\n}];"
+        "jsCode": "const data     = $('Code — Normalize Data').item.json;\nconst linkData = $input.item.json;\n\nconst expiresAt = new Date();\nexpiresAt.setMinutes(expiresAt.getMinutes() + 30);\n\nreturn [{\n  json: {\n    ...data,\n    magic_link:            linkData.url   ?? null,\n    magic_link_expires_at: expiresAt.toISOString(),\n  }\n}];"
       },
       "name": "Code — Add Magic Link",
       "type": "n8n-nodes-base.code",
@@ -110,7 +113,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d = $('Code — Add Magic Link').first().json;\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            true,\n    email_provider:        'mailgun',\n    sms_sent:              false,\n    status:                'Sent',\n    n8n_execution_id:      $execution.id,\n  }\n}];"
+        "jsCode": "const d = $('Code — Add Magic Link').item.json;\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            true,\n    email_provider:        'mailgun',\n    sms_sent:              false,\n    status:                'Sent',\n    n8n_execution_id:      $execution.id,\n  }\n}];"
       },
       "name": "Code — Prep Email Log",
       "type": "n8n-nodes-base.code",
@@ -119,7 +122,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const d      = $('Code — Add Magic Link').first().json;\nconst vonage = $input.first().json;\nconst msg    = vonage?.messages?.[0];\nconst ok     = msg?.status === '0';\n\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            false,\n    sms_sent:              ok,\n    sms_provider:          'vonage',\n    status:                ok ? 'Sent' : 'Failed',\n    failure_reason:        ok ? null : (msg?.['error-text'] ?? 'Unknown Vonage error'),\n    n8n_execution_id:      $execution.id,\n  }\n}];"
+        "jsCode": "const d      = $('Code — Add Magic Link').item.json;\nconst vonage = $input.item.json;\nconst msg    = vonage?.messages?.[0];\nconst ok     = msg?.status === '0';\n\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            false,\n    sms_sent:              ok,\n    sms_provider:          'vonage',\n    status:                ok ? 'Sent' : 'Failed',\n    failure_reason:        ok ? null : (msg?.['error-text'] ?? 'Unknown Vonage error'),\n    n8n_execution_id:      $execution.id,\n  }\n}];"
       },
       "name": "Code — Prep SMS Log",
       "type": "n8n-nodes-base.code",
@@ -128,14 +131,15 @@
     },
     {
       "parameters": {
-        "operation": "insert",
-        "schema": "public",
-        "table": "report_delivery_log",
-        "columns": "client_id,client_email,report_type,report_month,report_url,magic_link_sent,magic_link_expires_at,email_sent,email_provider,sms_sent,sms_provider,status,failure_reason,n8n_execution_id"
+        "operation": "executeQuery",
+        "query": "INSERT INTO report_delivery_log\n  (client_id, client_email, report_type, report_month, report_url,\n   magic_link_sent, magic_link_expires_at,\n   email_sent, email_provider,\n   sms_sent, sms_provider,\n   status, failure_reason, n8n_execution_id)\nVALUES\n  ($1, $2, $3,\n   NULLIF($4, 'null')::date,\n   NULLIF($5, 'null'),\n   $6::boolean, NULLIF($7, 'null')::timestamptz,\n   $8::boolean, NULLIF($9, 'null'),\n   $10::boolean, NULLIF($11, 'null'),\n   $12, NULLIF($13, 'null'), NULLIF($14, 'null'))\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.client_id }},{{ $json.client_email }},{{ $json.report_type }},{{ $json.report_month }},{{ $json.report_url }},{{ $json.magic_link_sent }},{{ $json.magic_link_expires_at }},{{ $json.email_sent }},{{ $json.email_provider }},{{ $json.sms_sent }},{{ $json.sms_provider }},{{ $json.status }},{{ $json.failure_reason }},{{ $json.n8n_execution_id }}"
+        }
       },
       "name": "Postgres — Log Delivery",
       "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
+      "typeVersion": 2.5,
       "position": [2010, 300]
     }
   ],
