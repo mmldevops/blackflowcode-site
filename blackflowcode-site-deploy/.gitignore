@@ -1,0 +1,11 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Local/build artifacts (none needed for this static site)
+node_modules/
+_fonts/
+*.log
