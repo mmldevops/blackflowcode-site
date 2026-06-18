@@ -27,3 +27,5 @@ bfc-dashboard/
 
 # Logs
 *.log
+exports/n8n-backups/
+scripts/n8n-backup.log
