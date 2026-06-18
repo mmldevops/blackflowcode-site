@@ -1,0 +1,347 @@
+{
+  "name": "BFC - Workflow 1 - Serial Offender Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-cron-2",
+      "name": "Daily 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id AS sub_id, s.company_name AS sub_name, s.trade_type, sa.alert_level, sa.violation_count, sa.weighted_score, sa.trigger_reason, sa.cure_period_end, sa.status FROM serial_offender_alerts sa JOIN subcontractors s ON s.id = sa.sub_id WHERE sa.status = 'active' AND sa.created_at > NOW() - INTERVAL '25 hours' ORDER BY sa.weighted_score DESC",
+        "options": {}
+      },
+      "id": "node-pg-2",
+      "name": "Get New Serial Offenders",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        496,
+        128
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-urgent",
+              "leftValue": "={{ $json.weighted_score }}",
+              "rightValue": 8,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-if-urgent",
+      "name": "Urgent? (score >= 8)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AVB8V1VJA"
+        },
+        "text": "=🚨 *NEW SERIAL OFFENDER DETECTED*\n\n| Field | Value |\n|---|---|\n| *Company* | {{ $json.sub_name }} |\n| *Trade* | {{ $json.trade_type }} |\n| *Alert Level* | {{ $json.alert_level }}/3 🔴 |\n| *Violations* | {{ $json.violation_count }} |\n| *Weighted Score* | {{ $json.weighted_score }}/10 |\n| *Cure Deadline* | {{ $json.cure_period_end ? new Date($json.cure_period_end).toLocaleDateString() : 'N/A' }} |\n\n*Trigger:* {{ $json.trigger_reason }}\n\n👉 _Action required: Immediate outreach within 24 hours_\n\n_Generated: {{ $now.toFormat('yyyy-MM-dd HH:mm') }} CST_",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-urgent",
+      "name": "Slack - Urgent Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        208
+      ],
+      "webhookId": "272a84b8-1462-458e-845b-7b53fd01c5bf",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=🔔 *New Compliance Lead*\n\n| Field | Value |\n|---|---|\n| *Company* | {{ $json.sub_name }} |\n| *Trade* | {{ $json.trade_type }} |\n| *Score* | {{ $json.weighted_score }}/10 🟡 |\n| *Violations* | {{ $json.violation_count }} |\n| *Alert Level* | {{ $json.alert_level }}/3 |\n\n*Trigger:* {{ $json.trigger_reason }}\n\n_Generated: {{ $now.toFormat('yyyy-MM-dd HH:mm') }} CST_",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AUXMUC2NB"
+        },
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-standard",
+      "name": "Slack - Standard Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        432
+      ],
+      "webhookId": "b82a1335-43a0-4e47-a744-af5f946a309a",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "341d9016-ebd2-4b4a-99e8-f7713c27bb58",
+          "mode": "id"
+        },
+        "title": "={{ $json.sub_name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Source",
+              "type": "select",
+              "selectValue": "OSHA"
+            },
+            {
+              "key": "Status",
+              "type": "select",
+              "selectValue": "New"
+            },
+            {
+              "key": "Urgency",
+              "type": "number",
+              "numberValue": "={{ $json.weighted_score }}"
+            },
+            {
+              "key": "Violation Count",
+              "type": "number",
+              "numberValue": "={{ $json.violation_count }}"
+            },
+            {
+              "key": "Trade Type",
+              "type": "richText"
+            },
+            {
+              "key": "Alert Level",
+              "type": "number",
+              "numberValue": "={{ $json.alert_level }}"
+            },
+            {
+              "key": "Trigger Reason",
+              "type": "richText"
+            },
+            {
+              "key": "Supabase ID",
+              "type": "richText"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-notion-serial",
+      "name": "Add to Notion Sales Leads",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        304
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "OT70yoshzZedthfT",
+          "name": "Notion account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS expired, (SELECT COUNT(*) FROM subcontractor_certificates WHERE expiration_date BETWEEN NOW() AND NOW() + INTERVAL '30 days') AS urgent, (SELECT COUNT(*) FROM serial_offender_alerts WHERE status = 'active') AS active_alerts FROM subcontractor_certificates WHERE expiration_date < NOW()",
+        "options": {}
+      },
+      "id": "node-pg-daily-summary",
+      "name": "Get Daily Summary Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        992,
+        592
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=📊 *Daily Compliance Summary — {{ $now.toFormat('yyyy-MM-dd') }}*\n\n| Metric | Count |\n|---|---|\n| Expired Certs | {{ $json.expired }} |\n| Urgent (30d) | {{ $json.urgent }} |\n| Active Serial Offender Alerts | {{ $json.active_alerts }} |\n\n_Auto-generated by BFC Compliance System_",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AVDB0S7TL"
+        },
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-daily",
+      "name": "Slack - Daily Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        512
+      ],
+      "webhookId": "73ba470e-3df8-4267-b4e7-7ef9cb1caf0f",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Get New Serial Offenders",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Daily Summary Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Serial Offenders": {
+      "main": [
+        [
+          {
+            "node": "Urgent? (score >= 8)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent? (score >= 8)": {
+      "main": [
+        [
+          {
+            "node": "Slack - Urgent Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Standard Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Urgent Alert": {
+      "main": [
+        [
+          {
+            "node": "Add to Notion Sales Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Standard Alert": {
+      "main": [
+        [
+          {
+            "node": "Add to Notion Sales Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Daily Summary Stats": {
+      "main": [
+        [
+          {
+            "node": "Slack - Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "ylOdF4oZn4lgMqON",
+    "binaryMode": "separate"
+  },
+  "active": true,
+  "_id": "DmeFv4ugDpVDP6Yb",
+  "_tags": []
+}

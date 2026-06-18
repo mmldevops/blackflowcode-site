@@ -1,0 +1,352 @@
+{
+  "name": "BFC - Workflow 4 - AI Email Personalization",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-cron-email",
+      "name": "Daily 10 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id AS sub_id, s.company_name, s.trade_type, s.contact_email, s.contact_phone, s.city, s.state, sa.weighted_score, sa.violation_count, sa.trigger_reason, sa.alert_level FROM serial_offender_alerts sa JOIN subcontractors s ON s.id = sa.sub_id WHERE sa.status = 'active' AND s.contact_email IS NOT NULL AND s.contact_email != '' AND NOT EXISTS ( SELECT 1 FROM report_delivery_log rdl WHERE rdl.client_email = s.contact_email AND rdl.sent_at > NOW() - INTERVAL '7 days' ) ORDER BY sa.weighted_score DESC LIMIT 20",
+        "options": {}
+      },
+      "id": "node-pg-email",
+      "name": "Get Leads for Email",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-has-email",
+              "leftValue": "={{ $json.contact_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-email",
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.anthropicApi }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-sonnet-4-20250514"
+            },
+            {
+              "name": "max_tokens",
+              "value": "600"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\": \"user\", \"content\": \"Write a concise, professional cold outreach email for a compliance automation company (blackflowcode.ai) reaching out to a construction subcontractor.\\n\\nCompany: {{ $json.company_name }}\\nTrade: {{ $json.trade_type }}\\nLocation: {{ $json.city }}, {{ $json.state }}\\nViolation count: {{ $json.violation_count }}\\nCompliance issue: {{ $json.trigger_reason }}\\n\\nThe email should:\\n1. Be under 150 words\\n2. Reference their specific compliance situation without being accusatory\\n3. Position blackflowcode.ai as a solution that automates cert tracking and prevents violations\\n4. End with a clear CTA to book a 15-minute demo\\n5. Be warm but professional\\n\\nReturn ONLY the email body, no subject line, no greeting/sign-off placeholders.\"}]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-claude-email",
+      "name": "Claude - Generate Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jUNbyYL3BOC9TIQx",
+          "name": "anthropic-api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResponse = $input.first().json;\nconst emailBody = claudeResponse.content[0].text;\n\n// Get the lead data from 2 nodes back\nconst leadData = $('Get Leads for Email').first().json;\n\nreturn [{\n  json: {\n    to: leadData.contact_email,\n    company_name: leadData.company_name,\n    trade_type: leadData.trade_type,\n    sub_id: leadData.sub_id,\n    weighted_score: leadData.weighted_score,\n    subject: `Quick question about compliance automation — ${leadData.company_name}`,\n    body: emailBody,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-code-email",
+      "name": "Prepare Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}\n\n---\nNeno Gaspard\nFounder, blackflowcode.ai\nhello@blackflowcode.ai\n\nBook a 15-min demo: https://calendly.com/blackflowcode\n\nblackflowcode.ai — Where logic flows.",
+        "options": {
+          "fromName": "Neno at blackflowcode.ai"
+        }
+      },
+      "id": "node-gmail-send",
+      "name": "Gmail - Send Outreach",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1340,
+        240
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "2CtjqsPu2rgXHYzi",
+          "name": "Gmail account"
+        }
+      },
+      "webhookId": "d21d83e7-0956-4c0b-8706-04eb68a7f654"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "report_delivery_log",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "client_id": "={{ $json.sub_id }}",
+            "client_email": "={{ $json.to }}",
+            "report_type": "Commercial Lending",
+            "report_month": "={{ $now.toFormat('yyyy-MM-01') }}",
+            "email_sent": true,
+            "email_provider": "Gmail",
+            "status": "Delivered",
+            "n8n_execution_id": "={{ $execution.id }}",
+            "sent_at": "={{ $now.toISO() }}",
+            "notes": "AI personalized outreach email — {{ $json.company_name }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-pg-log",
+      "name": "Log Delivery to Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1560,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=📧 *AI Email Campaign Complete — {{ $now.toFormat('yyyy-MM-dd') }}*\n\nSent *{{ $input.all().length }}* personalized outreach emails\n_Generated by Claude claude-sonnet-4-20250514 · logged to report_delivery_log_",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AVDB0S7TL"
+        },
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-email-done",
+      "name": "Slack - Campaign Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1780,
+        240
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "7eccfdc6-4fac-4a12-baad-279a7ac094fe"
+    },
+    {
+      "parameters": {},
+      "id": "node-noop-email",
+      "name": "No Leads - Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 10 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Leads for Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Leads for Email": {
+      "main": [
+        [
+          {
+            "node": "Has Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email?": {
+      "main": [
+        [
+          {
+            "node": "Claude - Generate Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Leads - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Generate Email": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Send Outreach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Send Outreach": {
+      "main": [
+        [
+          {
+            "node": "Log Delivery to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Delivery to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Slack - Campaign Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "active": false,
+  "_id": "9HOVsoWkGr3Gi6OH",
+  "_tags": []
+}

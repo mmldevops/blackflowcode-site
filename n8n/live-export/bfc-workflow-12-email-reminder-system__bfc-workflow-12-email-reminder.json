@@ -1,0 +1,193 @@
+{
+  "name": "BFC — Workflow 12 — Email Reminder System",
+  "nodes": [
+    {
+      "id": "node-01-cron",
+      "name": "01 · Schedule · Daily 9am CT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-02-fetch",
+      "name": "02 · Postgres · Fetch Pending Escalations",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT subcontractor_id, document_type, site_order_id, next_occurrence_to_fire, next_occurrence_day, is_terminal_escalation, sub_name, gc_name, last_sent_at, days_since_last_send FROM v_reminder_dispatch_pending ORDER BY next_occurrence_day DESC, last_sent_at ASC;",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-04-call-w8",
+      "name": "04 · HTTP · Call Workflow 8 Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xsg0IdvnHvvFPy17",
+          "name": "BFC-Webhook-Token"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/issue-doc-link",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  subcontractor_id: $json.subcontractor_id,\n  document_type: $json.document_type,\n  site_order_id: $json.site_order_id,\n  issued_for_occurrence: $json.next_occurrence_to_fire,\n  issued_by: 'cert_workflow',\n  ttl_hours: 168,\n  verification_required: true,\n  occurrence_day: $json.next_occurrence_day\n}) }}",
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 2,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "node-05-if-terminal",
+      "name": "05 · IF · Is Terminal Escalation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c-terminal",
+              "leftValue": "={{ $('02 · Postgres · Fetch Pending Escalations').item.json.is_terminal_escalation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-06-slack",
+      "name": "06 · Slack · GC Manual Escalation Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REDACTED",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  text: 'Manual escalation triggered',\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: 'Manual escalation triggered — 28 days, no upload' } },\n    { type: 'section', fields: [\n      { type: 'mrkdwn', text: '*Subcontractor:*  ' + $('02 · Postgres · Fetch Pending Escalations').item.json.sub_name },\n      { type: 'mrkdwn', text: '*GC:*  ' + $('02 · Postgres · Fetch Pending Escalations').item.json.gc_name },\n      { type: 'mrkdwn', text: '*Document Type:*  ' + $('02 · Postgres · Fetch Pending Escalations').item.json.document_type },\n      { type: 'mrkdwn', text: '*Days Since Initial Request:*  ' + Math.round($('02 · Postgres · Fetch Pending Escalations').item.json.days_since_last_send + 21) }\n    ]},\n    { type: 'section', text: { type: 'mrkdwn', text: '*Action:*  Final reminder email sent. The GC team should now contact this sub directly. After this point, the automated ladder is exhausted.' } },\n    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Workflow 12 · ' + new Date().toISOString() }]}\n  ]\n}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 · Schedule · Daily 9am CT": {
+      "main": [
+        [
+          {
+            "node": "02 · Postgres · Fetch Pending Escalations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Postgres · Fetch Pending Escalations": {
+      "main": [
+        [
+          {
+            "node": "04 · HTTP · Call Workflow 8 Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 · HTTP · Call Workflow 8 Webhook": {
+      "main": [
+        [
+          {
+            "node": "05 · IF · Is Terminal Escalation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 · IF · Is Terminal Escalation?": {
+      "main": [
+        [
+          {
+            "node": "06 · Slack · GC Manual Escalation Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "errorWorkflow": "BFC - Error Handler",
+    "timezone": "America/Chicago"
+  },
+  "active": false,
+  "_id": "bfc-workflow-12-email-reminder",
+  "_tags": [
+    "bfc-prod",
+    "bfc-sub"
+  ]
+}

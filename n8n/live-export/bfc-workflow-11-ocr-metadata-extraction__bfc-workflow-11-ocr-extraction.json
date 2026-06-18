@@ -1,0 +1,431 @@
+{
+  "name": "BFC — Workflow 11 — OCR Metadata Extraction",
+  "nodes": [
+    {
+      "id": "node-01-cron",
+      "name": "01 · Schedule · Every 30s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-02-claim",
+      "name": "02 · Postgres · Claim Pending",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH claimed AS (\n  SELECT q.id\n  FROM ocr_extraction_queue q\n  WHERE q.extraction_completed_at IS NULL\n    AND q.extraction_failed_at IS NULL\n    AND q.attempts < 3\n  ORDER BY q.created_at ASC\n  LIMIT 10\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE ocr_extraction_queue q\nSET attempts = attempts + 1\nFROM claimed\nWHERE q.id = claimed.id\nRETURNING q.id, q.cert_id, q.file_url, q.subcontractor_id, q.attempts;",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-03-extract-path",
+      "name": "03 · Set · Extract Storage Path",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        600,
+        300
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-path",
+              "name": "storage_path",
+              "value": "={{ $json.file_url.split('/storage/v1/object/sign/subcontractor-documents/')[1]?.split('?')[0] || $json.file_url.split('/storage/v1/object/subcontractor-documents/')[1]?.split('?')[0] || $json.file_url }}",
+              "type": "string"
+            },
+            {
+              "id": "a-mime",
+              "name": "mime_type",
+              "value": "={{ $json.file_url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : ($json.file_url.toLowerCase().endsWith('.png') ? 'image/png' : ($json.file_url.toLowerCase().endsWith('.jpg') || $json.file_url.toLowerCase().endsWith('.jpeg') ? 'image/jpeg' : ($json.file_url.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/png'))) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-04-sign",
+      "name": "04 · HTTP · Create Signed URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nfjg0DQs7Y5jl23H",
+          "name": "supabase-storage-bearer"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://lsgtllwlgcleraokdyfe.supabase.co/storage/v1/object/sign/subcontractor-documents/' + $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={ \"expiresIn\": 300 }",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "node-04c-prep",
+      "name": "04c · Code · Prepare Claude Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Use the signed URL directly — Claude fetches the file itself.\n// This avoids all binary-data / filesystem-mode complexity in n8n.\nconst signedPath  = $('04 · HTTP · Create Signed URL').item.json.signedURL;\nconst fullUrl     = 'https://lsgtllwlgcleraokdyfe.supabase.co/storage/v1' + signedPath;\nconst mimeType    = $('03 · Set · Extract Storage Path').item.json.mime_type;\nconst isPdf       = mimeType === 'application/pdf';\n\n// Claude supports source.type \"url\" for both images and documents.\nconst contentBlock = isPdf\n  ? { type: 'document', source: { type: 'url', url: fullUrl } }\n  : { type: 'image',    source: { type: 'url', url: fullUrl } };\n\nconst body = {\n  model: 'claude-sonnet-4-6',\n  max_tokens: 1024,\n  messages: [{\n    role: 'user',\n    content: [\n      contentBlock,\n      { type: 'text', text: 'You are looking at an insurance Certificate of Insurance (COI) document. Extract three fields from this document. Respond with ONLY a JSON object — no preamble, no markdown code fences, no explanation. The JSON must have exactly these three keys: \"policy_number\" (string, the insurance policy number; null if not visible), \"carrier_name\" (string, the insurance company that issued the policy, e.g. \"Liberty Mutual\" or \"Travelers\"; null if not visible), \"expiration_date\" (string in YYYY-MM-DD format, the policy expiration / end date; null if not visible). Be conservative — use null rather than guessing. If multiple policies are shown, return the values for the first general liability policy. Output JSON only.' }\n    ]\n  }]\n};\n\nreturn [{ json: { claudeBody: JSON.stringify(body) } }];"
+      }
+    },
+    {
+      "id": "node-05-claude",
+      "name": "05 · HTTP · Anthropic Claude Vision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xIB7pTLmcmnoy8qR",
+          "name": "anthropic_api_key"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": {
+          "timeout": 60000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 2,
+            "waitBetweenTries": 5000
+          }
+        }
+      }
+    },
+    {
+      "id": "node-06-parse",
+      "name": "06 · Code · Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Parse Claude's response — extract the JSON from its text content.\nconst response = $input.first().json;\nconst content = response.content && response.content[0] && response.content[0].text;\n\nif (!content) {\n  return [{ json: { extraction_successful: false, error: 'No content in Claude response' } }];\n}\n\n// Strip any markdown code fences in case Claude returned them.\nconst cleaned = content.trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/i, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  return [{ json: { extraction_successful: false, error: 'Could not parse JSON: ' + e.message } }];\n}\n\nconst policy_number = parsed.policy_number;\nconst carrier_name = parsed.carrier_name;\nconst expiration_date = parsed.expiration_date;\n\n// Success requires at least policy_number AND expiration_date.\nconst extraction_successful = !!(policy_number && expiration_date);\nif (!extraction_successful) {\n  return [{ json: { extraction_successful: false, error: 'Required fields missing — policy_number=' + policy_number + ', expiration_date=' + expiration_date } }];\n}\n\n// Validate date format.\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(expiration_date) || isNaN(Date.parse(expiration_date))) {\n  return [{ json: { extraction_successful: false, error: 'Invalid expiration_date format: ' + expiration_date } }];\n}\n\nreturn [{ json: { extraction_successful: true, policy_number, carrier_name: carrier_name || null, expiration_date } }];"
+      }
+    },
+    {
+      "id": "node-07-if-success",
+      "name": "07 · IF · Extraction Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c-success",
+              "leftValue": "={{ $json.extraction_successful }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-08-update-cert",
+      "name": "08 · Postgres · Update Certificate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1800,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE subcontractor_certificates\nSET policy_number = $1::text,\n    carrier_name = NULLIF($2, 'null')::text,\n    expiration_date = $3::date,\n    status = 'verified'\nWHERE id = NULLIF($4, 'null')::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.policy_number }},{{ $json.carrier_name }},{{ $json.expiration_date }},{{ $('02 · Postgres · Claim Pending').item.json.cert_id }}"
+        }
+      }
+    },
+    {
+      "id": "node-09-mark-complete",
+      "name": "09 · Postgres · Mark Queue Completed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2000,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ocr_extraction_queue\nSET extraction_completed_at = now(),\n    cert_updated_at = now(),\n    extracted_policy_number = $1::text,\n    extracted_carrier_name = NULLIF($2, 'null')::text,\n    extracted_expiration_date = $3::date,\n    last_error = NULL\nWHERE id = NULLIF($4, 'null')::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('06 · Code · Parse Claude Response').item.json.policy_number }},{{ $('06 · Code · Parse Claude Response').item.json.carrier_name }},{{ $('06 · Code · Parse Claude Response').item.json.expiration_date }},{{ $('02 · Postgres · Claim Pending').item.json.id }}"
+        }
+      }
+    },
+    {
+      "id": "node-10-mark-failed",
+      "name": "10 · Postgres · Mark Queue Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1800,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ocr_extraction_queue\nSET extraction_failed_at = now(),\n    last_error = $1::text\nWHERE id = NULLIF($2, 'null')::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ ($('06 · Code · Parse Claude Response').item.json.error || 'OCR extraction failed').replace(/,/g, ';') }},{{ $('02 · Postgres · Claim Pending').item.json.id }}"
+        }
+      }
+    },
+    {
+      "id": "node-11-slack",
+      "name": "11 · Slack · OCR Failure Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REDACTED",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  text: 'OCR extraction failed',\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: 'OCR extraction failed' } },\n    { type: 'section', fields: [\n      { type: 'mrkdwn', text: '*Cert ID:*  `' + $('02 · Postgres · Claim Pending').item.json.cert_id + '`' },\n      { type: 'mrkdwn', text: '*Error:*  ' + ($('06 · Code · Parse Claude Response').item.json.error || 'unknown') },\n      { type: 'mrkdwn', text: '*Attempts:*  ' + $('02 · Postgres · Claim Pending').item.json.attempts + ' of 3' },\n      { type: 'mrkdwn', text: '*Action:*  Manual review needed' }\n    ]},\n    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Workflow 11 · ' + new Date().toISOString() }]}\n  ]\n}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 · Schedule · Every 30s": {
+      "main": [
+        [
+          {
+            "node": "02 · Postgres · Claim Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Postgres · Claim Pending": {
+      "main": [
+        [
+          {
+            "node": "03 · Set · Extract Storage Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 · Set · Extract Storage Path": {
+      "main": [
+        [
+          {
+            "node": "04 · HTTP · Create Signed URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 · HTTP · Create Signed URL": {
+      "main": [
+        [
+          {
+            "node": "04c · Code · Prepare Claude Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04c · Code · Prepare Claude Payload": {
+      "main": [
+        [
+          {
+            "node": "05 · HTTP · Anthropic Claude Vision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 · HTTP · Anthropic Claude Vision": {
+      "main": [
+        [
+          {
+            "node": "06 · Code · Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 · Code · Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "07 · IF · Extraction Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 · IF · Extraction Successful?": {
+      "main": [
+        [
+          {
+            "node": "08 · Postgres · Update Certificate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10 · Postgres · Mark Queue Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 · Postgres · Update Certificate": {
+      "main": [
+        [
+          {
+            "node": "09 · Postgres · Mark Queue Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 · Postgres · Mark Queue Failed": {
+      "main": [
+        [
+          {
+            "node": "11 · Slack · OCR Failure Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "errorWorkflow": "BFC — Error Trigger",
+    "timezone": "America/Chicago"
+  },
+  "active": false,
+  "_id": "bfc-workflow-11-ocr-extraction",
+  "_tags": [
+    "bfc-prod",
+    "bfc-sub"
+  ]
+}

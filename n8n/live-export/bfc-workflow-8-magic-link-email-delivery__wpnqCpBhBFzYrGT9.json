@@ -1,0 +1,542 @@
+{
+  "name": "BFC — Workflow 8 — Magic Link Email Delivery",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "issue-doc-link",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "37bf6059-5453-4fab-9b12-0647ba1f3dd2",
+      "name": "01 · Webhook · Issue Doc Link",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        112
+      ],
+      "webhookId": "issue-doc-link",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xsg0IdvnHvvFPy17",
+          "name": "BFC-Webhook-Token"
+        }
+      },
+      "notes": "POST /webhook/issue-doc-link · header auth on X-BFC-Webhook-Token"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate webhook payload. Sets valid=false to flip Node 03 to error branch.\nconst body = $input.first().json.body || $input.first().json;\nconst errors = [];\n\nconst required = ['subcontractor_id', 'document_type', 'issued_for_occurrence', 'issued_by'];\nfor (const f of required) {\n  if (!body[f] || String(body[f]).trim() === '') errors.push(`missing:${f}`);\n}\n\nconst allowedTypes = ['cert', 'w9', 'lien_waiver', 'other'];\nif (body.document_type && !allowedTypes.includes(body.document_type)) {\n  errors.push(`bad_document_type:${body.document_type}`);\n}\n\n// Must match CHECK constraint on document_collection_tokens.issued_by\nconst allowedIssuedBy = ['w9_workflow', 'lien_workflow', 'cert_workflow', 'manual', 'api'];\nif (body.issued_by && !allowedIssuedBy.includes(body.issued_by)) {\n  errors.push(`bad_issued_by:${body.issued_by}`);\n}\n\nconst uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (body.subcontractor_id && !uuidRe.test(body.subcontractor_id)) {\n  errors.push('bad_uuid:subcontractor_id');\n}\nif (body.site_order_id && !uuidRe.test(body.site_order_id)) {\n  errors.push('bad_uuid:site_order_id');\n}\n\nconst allowedOccurrenceNames = ['Initial Request','First Reminder','Second Reminder','Final Notice','Manual Escalation','Off-Cycle Reminder'];\nconst occurrenceName = body.occurrence_name || 'Off-Cycle Reminder';\nif (!allowedOccurrenceNames.includes(occurrenceName)) errors.push(`bad_occurrence_name:${occurrenceName}`);\n\nconst ttlHours = Number(body.ttl_hours || 48);\nif (!Number.isFinite(ttlHours) || ttlHours < 1 || ttlHours > 240) {\n  errors.push('bad_ttl_hours');\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    body: {\n      subcontractor_id:       body.subcontractor_id,\n      document_type:          body.document_type,\n      site_order_id:          body.site_order_id || null,\n      issued_for_occurrence:  body.issued_for_occurrence,\n      issued_by:              body.issued_by,\n      ttl_hours:              ttlHours,\n      verification_required:  body.verification_required !== false,\n      occurrence_name:        occurrenceName\n    }\n  }\n}];"
+      },
+      "id": "4bbd7d98-582c-42db-8842-26608b4b9d80",
+      "name": "02 · Code · Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        112
+      ],
+      "notes": "Validates required fields, document_type enum, issued_by CHECK enum, UUIDs, ttl bounds."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bb0a4a79-15ee-4bdf-a038-65dd777687e6",
+      "name": "03 · IF · Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'invalid_input', fields: $json.errors } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "513b1267-e27a-46c5-ab33-b02315cfd1e1",
+      "name": "03b · Respond · 422 Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        0,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id,\n       s.company_name,\n       s.contact_name,\n       s.contact_email,\n       gc.company_name AS gc_name\nFROM   subcontractors s\nLEFT JOIN gc_subcontractor_relationships rel\n       ON rel.subcontractor_id = s.id\n       AND rel.relationship_status = 'active'\nLEFT JOIN gc_companies gc\n       ON gc.id = rel.gc_id\nWHERE  s.id = $1::uuid\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.subcontractor_id }}"
+        }
+      },
+      "id": "42c4ef79-81be-447f-94c2-25756346e375",
+      "name": "04 · Postgres · Resolve Subcontractor",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Joins subcontractors → gc_subcontractor_relationships → gc_companies. Real columns: relationship_status, gc_id."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c-has-email",
+              "leftValue": "={{ $json.contact_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "171dcc11-75dd-4778-9dc7-89aa97d28d1c",
+      "name": "05 · IF · Email Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'no_contact_email', subcontractor_id: $('02 · Code · Validate Input').item.json.body.subcontractor_id } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "31b70ff0-405e-4c73-b201-f87d9ccda678",
+      "name": "05b · Respond · 422 No Email",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        384,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM generate_upload_token(\n  $1::uuid,                  -- p_subcontractor_id\n  $2::text,                  -- p_document_type\n  NULLIF($3, 'null')::uuid,  -- p_site_order_id (NULLIF guards against n8n serializing JS null → string 'null')\n  $4::text,                  -- p_issued_for_occurrence\n  $5::text,                  -- p_issued_by\n  $6::integer,               -- p_ttl_hours\n  $7::boolean                -- p_verification_required\n);",
+        "options": {
+          "queryReplacement": "={{ $('02 · Code · Validate Input').item.json.body.subcontractor_id }},{{ $('02 · Code · Validate Input').item.json.body.document_type }},{{ $('02 · Code · Validate Input').item.json.body.site_order_id }},{{ $('02 · Code · Validate Input').item.json.body.issued_for_occurrence }},{{ $('02 · Code · Validate Input').item.json.body.issued_by }},{{ $('02 · Code · Validate Input').item.json.body.ttl_hours }},{{ $('02 · Code · Validate Input').item.json.body.verification_required }}"
+        }
+      },
+      "id": "709ae2fc-95b0-4322-a6b4-6fafa8b2a694",
+      "name": "06 · Postgres · Issue Token",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Calls generate_upload_token() RPC. Returns out_token, out_expires_at, out_replaced."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-doc-label",
+              "name": "document_label",
+              "value": "={{ ({ cert: 'Certificate of Insurance', w9: 'W-9 form', lien_waiver: 'Lien Waiver', other: 'Document' })[$('02 · Code · Validate Input').item.json.body.document_type] }}",
+              "type": "string"
+            },
+            {
+              "id": "a-doc-label-short",
+              "name": "document_label_short",
+              "value": "={{ ({ cert: 'COI', w9: 'W-9', lien_waiver: 'Lien Waiver', other: 'Document' })[$('02 · Code · Validate Input').item.json.body.document_type] }}",
+              "type": "string"
+            },
+            {
+              "id": "a-magic-link",
+              "name": "magic_link_url",
+              "value": "=https://uploads.blackflowcode.com/?token={{ $('06 · Postgres · Issue Token').item.json.out_token }}",
+              "type": "string"
+            },
+            {
+              "id": "a-contact-first",
+              "name": "contact_first_name",
+              "value": "={{ ($('04 · Postgres · Resolve Subcontractor').item.json.contact_name || 'there').split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "a-gc-name",
+              "name": "gc_name_safe",
+              "value": "={{ $('04 · Postgres · Resolve Subcontractor').item.json.gc_name || 'A general contractor' }}",
+              "type": "string"
+            },
+            {
+              "id": "a-sub-name",
+              "name": "sub_name",
+              "value": "={{ $('04 · Postgres · Resolve Subcontractor').item.json.company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "a-occurrence",
+              "name": "issued_for_occurrence",
+              "value": "={{ $('02 · Code · Validate Input').item.json.body.issued_for_occurrence }}",
+              "type": "string"
+            },
+            {
+              "id": "a-ttl",
+              "name": "ttl_hours",
+              "value": "={{ $('02 · Code · Validate Input').item.json.body.ttl_hours }}",
+              "type": "number"
+            },
+            {
+              "id": "a-subject",
+              "name": "email_subject",
+              "value": "={{ ({ cert: 'Document needed: Certificate of Insurance — ' + ($('04 · Postgres · Resolve Subcontractor').item.json.gc_name || 'BFC'), w9: 'Document needed: W-9 form — ' + ($('04 · Postgres · Resolve Subcontractor').item.json.gc_name || 'BFC'), lien_waiver: 'Lien waiver needed before payment release — ' + $('02 · Code · Validate Input').item.json.body.issued_for_occurrence, other: 'Document needed: ' + $('02 · Code · Validate Input').item.json.body.issued_for_occurrence })[$('02 · Code · Validate Input').item.json.body.document_type] }}",
+              "type": "string"
+            },
+            {
+              "id": "a-html",
+              "name": "email_html",
+              "value": "=<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"/><meta name=\"viewport\" content=\"width=device-width\"/></head><body style=\"margin:0;padding:0;background:#F4F4F2;font-family:'Helvetica Neue',Arial,sans-serif;color:#07080B;line-height:1.65\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" bgcolor=\"#F4F4F2\"><tr><td align=\"center\" style=\"padding:24px 16px\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px\"><tr><td style=\"background:#07080B;border-radius:8px 8px 0 0;padding:22px 28px\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"background:#B8E532;border-radius:6px;width:32px;height:32px;text-align:center;font-family:'Courier New',monospace;font-weight:700;font-size:15px;color:#07080B;line-height:32px\">&gt;_</td><td style=\"padding-left:12px;font-weight:700;font-size:15px;color:#FFFFFF\">Blackflowcode<span style=\"color:#B8E532\">.ai</span></td></tr></table></td></tr><tr><td style=\"background:#FFFFFF;border:1px solid #E9E9E9;border-top:0;border-radius:0 0 8px 8px;padding:32px 36px\"><div style=\"font-family:'Courier New',monospace;font-size:11px;color:#5E7B1F;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:14px\"><span style=\"display:inline-block;width:24px;height:1px;background:#B8E532;vertical-align:middle;margin-right:10px\"></span>DOCUMENT REQUEST · {{ ({ cert: 'COI', w9: 'W-9', lien_waiver: 'LIEN WAIVER', other: 'DOCUMENT' })[$('02 · Code · Validate Input').item.json.body.document_type] }}</div><h1 style=\"font-weight:700;font-size:26px;line-height:1.2;color:#07080B;margin:0 0 18px\">We need your {{ ({ cert: 'COI', w9: 'W-9', lien_waiver: 'lien waiver', other: 'document' })[$('02 · Code · Validate Input').item.json.body.document_type] }}.</h1><p style=\"font-size:15px;line-height:1.7;color:#2A2F38;margin:0 0 18px\">Hi {{ ($('04 · Postgres · Resolve Subcontractor').item.json.contact_name || 'there').split(' ')[0] }},</p><p style=\"font-size:15px;line-height:1.7;color:#2A2F38;margin:0 0 22px\"><strong style=\"color:#07080B\">{{ $('04 · Postgres · Resolve Subcontractor').item.json.gc_name || 'A general contractor' }}</strong> needs an updated <strong style=\"color:#07080B\">{{ ({ cert: 'Certificate of Insurance', w9: 'W-9 form', lien_waiver: 'Lien Waiver', other: 'Document' })[$('02 · Code · Validate Input').item.json.body.document_type] }}</strong> from <strong style=\"color:#07080B\">{{ $('04 · Postgres · Resolve Subcontractor').item.json.company_name }}</strong> for the <strong style=\"color:#07080B\">{{ $('02 · Code · Validate Input').item.json.body.issued_for_occurrence }}</strong> occurrence. Use the secure link below to upload it. The link works for {{ $('02 · Code · Validate Input').item.json.body.ttl_hours }} hours and can be used once.</p><p style=\"margin:0 0 22px\"><a href=\"https://uploads.blackflowcode.com/?token={{ $('06 · Postgres · Issue Token').item.json.out_token }}\" style=\"background:#B8E532;color:#07080B;padding:16px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block\">Upload {{ ({ cert: 'COI', w9: 'W-9', lien_waiver: 'Lien Waiver', other: 'Document' })[$('02 · Code · Validate Input').item.json.body.document_type] }}</a></p><p style=\"font-family:'Courier New',monospace;font-size:12px;color:#6A7585;margin:0 0 22px;word-break:break-all\">Or paste this URL into your browser:<br/><a href=\"https://uploads.blackflowcode.com/?token={{ $('06 · Postgres · Issue Token').item.json.out_token }}\" style=\"color:#5E7B1F;text-decoration:underline\">https://uploads.blackflowcode.com/?token={{ $('06 · Postgres · Issue Token').item.json.out_token }}</a></p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6FAEC;border-left:2px solid #B8E532;border-radius:0 6px 6px 0;margin:0 0 22px\"><tr><td style=\"padding:16px 18px;font-size:13px;line-height:1.7;color:#2A2F38\"><strong style=\"color:#07080B;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;font-family:'Courier New',monospace\">What to expect</strong><br/>PDF, JPG, PNG, DOC, or DOCX up to 10 MB. The page works on phone or computer — you can take a photo of a paper document if needed. We'll confirm by email as soon as it's received.</td></tr></table><p style=\"font-size:14px;line-height:1.7;color:#2A2F38;margin:4px 0 0\">Questions? Reply to this email or call <a href=\"tel:+15166041804\" style=\"color:#5E7B1F;text-decoration:underline\">(516) 604-1804</a>.<br/>— The Blackflowcode team</p></td></tr><tr><td style=\"padding:22px 12px 8px;text-align:center;font-family:'Courier New',monospace;font-size:11px;color:#6A7585;letter-spacing:0.06em\">Blackflowcode.ai · <a href=\"mailto:hello@blackflowcode.com\" style=\"color:#6A7585;text-decoration:underline\">hello@blackflowcode.com</a> · (516) 604-1804<br/><span style=\"font-size:10px;color:#97A1B0\">You received this because {{ $('04 · Postgres · Resolve Subcontractor').item.json.gc_name || 'a general contractor' }} requested a document from {{ $('04 · Postgres · Resolve Subcontractor').item.json.company_name }}.<br/>This is a transactional message; you cannot unsubscribe from individual document requests.</span></td></tr></table></td></tr></table></body></html>",
+              "type": "string"
+            },
+            {
+              "id": "a-text",
+              "name": "email_text",
+              "value": "=Hi {{ ($('04 · Postgres · Resolve Subcontractor').item.json.contact_name || 'there').split(' ')[0] }},\n\n{{ $('04 · Postgres · Resolve Subcontractor').item.json.gc_name || 'A general contractor' }} needs a {{ ({ cert: 'Certificate of Insurance', w9: 'W-9 form', lien_waiver: 'Lien Waiver', other: 'document' })[$('02 · Code · Validate Input').item.json.body.document_type] }} from {{ $('04 · Postgres · Resolve Subcontractor').item.json.company_name }}.\n\nUse this secure link to upload it (works for {{ $('02 · Code · Validate Input').item.json.body.ttl_hours }} hours, single-use):\n\nhttps://uploads.blackflowcode.com/?token={{ $('06 · Postgres · Issue Token').item.json.out_token }}\n\nQuestions? Reply to this email or call (516) 604-1804.\n\n— The Blackflowcode team",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c1fdfcdf-590a-48e3-91ab-03bc901ed6ce",
+      "name": "07 · Set · Build Email Body",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        0
+      ],
+      "notes": "11 assignments. No $env references. Uses hardcoded uploads.blackflowcode.com URL."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mailgun.net/v3/notifications.blackflowcodeai.com/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mailgunApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "from",
+              "value": "Blackflowcode <notifications@notifications.blackflowcodeai.com>"
+            },
+            {
+              "name": "to",
+              "value": "={{ $('04 · Postgres · Resolve Subcontractor').item.json.contact_email }}"
+            },
+            {
+              "name": "h:Reply-To",
+              "value": "hello@blackflowcodeai.com"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $json.email_subject }}"
+            },
+            {
+              "name": "html",
+              "value": "={{ $json.email_html }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.email_text }}"
+            },
+            {
+              "name": "o:tag",
+              "value": "bfc-sub"
+            },
+            {
+              "name": "o:tag",
+              "value": "doc-link"
+            },
+            {
+              "name": "o:tag",
+              "value": "={{ $('02 · Code · Validate Input').item.json.body.document_type }}"
+            },
+            {
+              "name": "o:tracking",
+              "value": "yes"
+            },
+            {
+              "name": "o:tracking-clicks",
+              "value": "yes"
+            },
+            {
+              "name": "o:tracking-opens",
+              "value": "yes"
+            },
+            {
+              "name": "v:token",
+              "value": "={{ $('06 · Postgres · Issue Token').item.json.out_token }}"
+            },
+            {
+              "name": "v:doc_type",
+              "value": "={{ $('02 · Code · Validate Input').item.json.body.document_type }}"
+            },
+            {
+              "name": "v:sub_id",
+              "value": "={{ $('02 · Code · Validate Input').item.json.body.subcontractor_id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fe66915e-b068-4dca-9f56-9f3452796582",
+      "name": "08 · HTTP · Mailgun Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "mailgunApi": {
+          "id": "UEW2rshZjsSnvDLt",
+          "name": "Mailgun Production"
+        }
+      },
+      "notes": "Form-encoded body required (Mailgun strips v: variables on JSON). From and Reply-To hardcoded."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO document_collection_log (\n  subcontractor_id,\n  document_type,\n  site_order_id,\n  occurrence_name,\n  occurrence_day,\n  email_to,\n  email_from,\n  email_subject,\n  email_provider,\n  email_message_id,\n  token,\n  status,\n  sent_at,\n  n8n_execution_id,\n  n8n_workflow_id\n) VALUES (\n  $1::uuid, $2::text, NULLIF($3, 'null')::uuid, $4::text, 0,\n  $5::text, $6::text, $7::text, 'Mailgun', $8::text,\n  $9::uuid, 'sent', now(),\n  $10::text, $11::text\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "{{ $('02 · Code · Validate Input').item.json.body.subcontractor_id }},{{ $('02 · Code · Validate Input').item.json.body.document_type }},{{ $('02 · Code · Validate Input').item.json.body.site_order_id }},{{ $('02 · Code · Validate Input').item.json.body.occurrence_name }},{{ $('04 · Postgres · Resolve Subcontractor').item.json.contact_email }},{{ 'notifications@notifications.blackflowcodeai.com' }},{{ $('07 · Set · Build Email Body').item.json.email_subject }},{{ $('08 · HTTP · Mailgun Send').item.json.id }},{{ $('06 · Postgres · Issue Token').item.json.out_token }},{{ $execution.id }},{{ $workflow.id }}"
+        }
+      },
+      "id": "266fe7f4-52ef-4483-9609-3a16460b9195",
+      "name": "09 · Postgres · Insert Log Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1104,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Tokens table column = issued_for_occurrence; log table column = occurrence_name (schema asymmetry)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, token: $('06 · Postgres · Issue Token').item.json.out_token, expires_at: $('06 · Postgres · Issue Token').item.json.out_expires_at, replaced_prior: $('06 · Postgres · Issue Token').item.json.out_replaced, mailgun_message_id: $('08 · HTTP · Mailgun Send').item.json.id, log_id: $json.id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "5db040a0-9f11-4946-9cfe-9af3a0f0bd8c",
+      "name": "10 · Respond · 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "01 · Webhook · Issue Doc Link": {
+      "main": [
+        [
+          {
+            "node": "02 · Code · Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Code · Validate Input": {
+      "main": [
+        [
+          {
+            "node": "03 · IF · Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 · IF · Valid?": {
+      "main": [
+        [
+          {
+            "node": "04 · Postgres · Resolve Subcontractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03b · Respond · 422 Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 · Postgres · Resolve Subcontractor": {
+      "main": [
+        [
+          {
+            "node": "05 · IF · Email Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 · IF · Email Exists?": {
+      "main": [
+        [
+          {
+            "node": "06 · Postgres · Issue Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05b · Respond · 422 No Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 · Postgres · Issue Token": {
+      "main": [
+        [
+          {
+            "node": "07 · Set · Build Email Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 · Set · Build Email Body": {
+      "main": [
+        [
+          {
+            "node": "08 · HTTP · Mailgun Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 · HTTP · Mailgun Send": {
+      "main": [
+        [
+          {
+            "node": "09 · Postgres · Insert Log Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 · Postgres · Insert Log Row": {
+      "main": [
+        [
+          {
+            "node": "10 · Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true,
+    "errorWorkflow": "ylOdF4oZn4lgMqON"
+  },
+  "active": true,
+  "_id": "wpnqCpBhBFzYrGT9",
+  "_tags": [
+    "bfc-prod",
+    "bfc-sub"
+  ]
+}
