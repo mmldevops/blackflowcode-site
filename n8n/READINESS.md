@@ -11,21 +11,18 @@ container `n8n-hich-n8n-1`, behind Traefik). Fallback URL:
 - Added `scripts/n8n-backup.sh` (API export → B2).
 - Moved Vonage secrets out of the inline `docker-compose.yml` into the project env store
   (zero downtime; snapshot `284358` taken first, expires 2026-07-08).
+- Configured rclone `b2` remote + scheduled `scripts/n8n-backup.sh` (cron every 6h; n8n key
+  in `~/.config/n8n-backup.env`, chmod 600). Verified: 16 workflows land in
+  `b2:blackflow-storage/n8n-workflows/<timestamp>/`. NOTE: this is the laptop-side workflow
+  backup (depends on the machine being on) — the VPS-side DB cron (#4) is still the
+  authoritative one.
 
 ---
 
-## ☐ 3. Configure rclone B2 remote  *(your terminal — keeps the secret local)*
-```bash
-rclone config
-#  n → new   name: b2   storage: b2 (Backblaze B2)
-#  account: <B2 keyID>   key: <B2 applicationKey>   (scope to bucket blackflow-storage)
-rclone lsd b2:blackflow-storage          # verify
-```
-Then enable the workflow backup (laptop/server that stays on):
-```bash
-crontab -e
-0 */6 * * * N8N_API_KEY="<key>" /ABS/PATH/scripts/n8n-backup.sh
-```
+## ✅ 3. rclone B2 remote + scheduled workflow backup  — DONE
+Remote `b2` configured; `scripts/n8n-backup.sh` runs via cron every 6h (n8n key in
+`~/.config/n8n-backup.env`, chmod 600). Backups land in `b2:blackflow-storage/n8n-workflows/`.
+After rotating the n8n API key, update `~/.config/n8n-backup.env`.
 
 ## ☐ 4. VPS-side full DB backup  *(SSH to the VPS — captures creds + encryption key)*
 ```bash
