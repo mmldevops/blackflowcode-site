@@ -1,0 +1,272 @@
+{
+  "name": "BFC-20 · Procore Webhook Receiver",
+  "nodes": [
+    {
+      "id": "bfc20-node-01",
+      "name": "Procore: Incoming Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "procore-payment-events",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "procore-payment-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-02",
+      "name": "Validate HMAC Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst incoming = $input.first().json;\nconst headers = incoming.headers || {};\n\n// Raw body is required for HMAC — parsed JSON would produce a different hash\nconst rawBody = incoming.rawBody || JSON.stringify(incoming.body || {});\n\nconst secret = $env.PROCORE_WEBHOOK_SECRET;\nif (!secret) {\n  throw new Error('PROCORE_WEBHOOK_SECRET env var not set on this n8n instance');\n}\n\nconst signature = headers['x-procore-hmac-sha256'];\nif (!signature) {\n  throw new Error('Missing X-Procore-Hmac-SHA256 header — request rejected');\n}\n\nconst expected = crypto\n  .createHmac('sha256', secret)\n  .update(rawBody, 'utf8')\n  .digest('hex');\n\n// Timing-safe comparison prevents timing attacks\nlet sigValid = false;\ntry {\n  const sigBuf = Buffer.from(signature.replace('sha256=', ''), 'hex');\n  const expBuf = Buffer.from(expected, 'hex');\n  sigValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);\n} catch (e) {\n  throw new Error(`HMAC comparison failed: ${e.message}`);\n}\n\nif (!sigValid) {\n  throw new Error('HMAC signature mismatch — request rejected');\n}\n\nconst body = incoming.body || {};\n\nreturn [{\n  json: {\n    event_type:   body.event_type   || null,\n    resource_id:  body.resource_id  || null,\n    project_id:   body.project_id   || null,\n    company_id:   body.company_id   || null,\n    timestamp:    body.timestamp    || null,\n    api_version:  body.api_version  || 'v1.0',\n    n8n_execution_id: $execution.id,\n    n8n_workflow_id:  $workflow.id,\n    received_at: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "bfc20-node-03",
+      "name": "Filter: Payment Apps Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-event-type",
+              "leftValue": "={{ $json.event_type }}",
+              "rightValue": "payment_applications",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "cond-resource-id",
+              "leftValue": "={{ $json.resource_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-04",
+      "name": "200 OK: Event Ignored",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 480],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ignored', event_type: $json.event_type, message: 'Not a payment_applications event — no action taken' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-05",
+      "name": "Procore: Get Payment Application",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.procore.com/rest/v1.0/payment_applications/{{ $json.resource_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "procoreOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "project_id",
+              "value": "={{ $json.project_id }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 8000
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-06",
+      "name": "Extract Contract ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "jsCode": "const paData   = $input.first().json;\nconst prevData = $('Filter: Payment Apps Only').first().json;\n\n// Procore PaymentApplication nests the contract as contract.id\n// Fallback to top-level contract_id if structure differs\nconst contractId =\n  paData?.contract?.id ??\n  paData?.contract_id ??\n  null;\n\nif (!contractId) {\n  throw new Error(\n    `Could not extract contract_id from PaymentApplication ${ prevData.resource_id }. ` +\n    `Procore response keys: ${ Object.keys(paData).join(', ') }`\n  );\n}\n\nreturn [{\n  json: {\n    ...prevData,\n    procore_payment_app_id: Number(prevData.resource_id),\n    procore_contract_id:    Number(contractId),\n    payment_app_status:     paData.status          || null,\n    payment_app_number:     paData.number          || null,\n    payment_app_amount:     paData.billing_amount ?? paData.amount ?? null\n  }\n}];"
+      }
+    },
+    {
+      "id": "bfc20-node-07",
+      "name": "Lookup: site_order_id",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1340, 300],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id::text AS site_order_id, order_number, subcontractor_id::text FROM public.site_orders WHERE procore_id = $1::bigint LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.procore_contract_id }}"
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-08",
+      "name": "Site Order Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 300],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-found",
+              "leftValue": "={{ $json.site_order_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-09",
+      "name": "200 OK: No Site Order Match",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 480],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'no_match', procore_contract_id: $('Extract Contract ID').first().json.procore_contract_id, message: 'No site_order found for this Procore contract — skipping payment gate. Ensure procore_id is populated on the site_order.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-10",
+      "name": "Build W5 Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300],
+      "parameters": {
+        "jsCode": "const lookup    = $input.first().json;\nconst extracted = $('Extract Contract ID').first().json;\n\nconst detail = [\n  `event:${ extracted.event_type }`,\n  `pay_app_id:${ extracted.procore_payment_app_id }`,\n  `contract_id:${ extracted.procore_contract_id }`,\n  `pay_app_status:${ extracted.payment_app_status }`,\n  extracted.payment_app_amount != null ? `amount:${ extracted.payment_app_amount }` : null\n].filter(Boolean).join(' | ');\n\nreturn [{\n  json: {\n    // W5 payload\n    site_order_id:        lookup.site_order_id,\n    triggered_by:         'procore_webhook',\n    triggered_by_detail:  detail,\n    // pass-through for 200 OK response body\n    _meta: {\n      order_number:              lookup.order_number,\n      subcontractor_id:          lookup.subcontractor_id,\n      procore_payment_app_id:    extracted.procore_payment_app_id,\n      procore_contract_id:       extracted.procore_contract_id,\n      payment_app_status:        extracted.payment_app_status,\n      received_at:               extracted.received_at,\n      n8n_execution_id:          extracted.n8n_execution_id\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "bfc20-node-11",
+      "name": "200 OK → Procore",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'accepted', site_order_id: $json.site_order_id, message: 'Payment gate check queued', bfc_execution_id: $json._meta.n8n_execution_id }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "bfc20-node-12",
+      "name": "POST → W5 Payment Gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.blackflowcode.ai/webhook/payment-gate-check",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ site_order_id: $('Build W5 Payload').first().json.site_order_id, triggered_by: 'procore_webhook', triggered_by_detail: $('Build W5 Payload').first().json.triggered_by_detail }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Procore: Incoming Webhook": {
+      "main": [
+        [{ "node": "Validate HMAC Signature", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate HMAC Signature": {
+      "main": [
+        [{ "node": "Filter: Payment Apps Only", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter: Payment Apps Only": {
+      "main": [
+        [{ "node": "Procore: Get Payment Application", "type": "main", "index": 0 }],
+        [{ "node": "200 OK: Event Ignored", "type": "main", "index": 0 }]
+      ]
+    },
+    "Procore: Get Payment Application": {
+      "main": [
+        [{ "node": "Extract Contract ID", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Contract ID": {
+      "main": [
+        [{ "node": "Lookup: site_order_id", "type": "main", "index": 0 }]
+      ]
+    },
+    "Lookup: site_order_id": {
+      "main": [
+        [{ "node": "Site Order Found?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Site Order Found?": {
+      "main": [
+        [{ "node": "Build W5 Payload", "type": "main", "index": 0 }],
+        [{ "node": "200 OK: No Site Order Match", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build W5 Payload": {
+      "main": [
+        [{ "node": "200 OK → Procore", "type": "main", "index": 0 }]
+      ]
+    },
+    "200 OK → Procore": {
+      "main": [
+        [{ "node": "POST → W5 Payment Gate", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "instanceId": "bfc20"
+  }
+}

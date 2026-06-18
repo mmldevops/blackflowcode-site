@@ -1,0 +1,546 @@
+{
+  "name": "BFC — Workflow 8b — Mailgun Events Receiver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mailgun-events",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "84777abf-87d5-445b-b652-52be8ea3dee6",
+      "name": "01 · Webhook · Mailgun Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        544
+      ],
+      "webhookId": "mailgun-events",
+      "notes": "POST /webhook/mailgun-events. NO header auth — Mailgun signs every request with HMAC-SHA256, verified in Node 02. Public URL required (Mailgun must reach it). For localhost dev, use ngrok or Cloudflare Tunnel."
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst SIGNING_KEY = 'a4913c9628de30480aa4c4a17fc03617';\n\nconst body = $input.first().json.body || $input.first().json;\nconst sig  = body.signature || {};\nconst data = body['event-data'] || {};\n\nconst computed = crypto\n  .createHmac('sha256', SIGNING_KEY)\n  .update(String(sig.timestamp) + String(sig.token))\n  .digest('hex');\nconst valid = computed === sig.signature;\n\nconst vars = data['user-variables'] || {};\nconst event_ts_epoch = data.timestamp || (Date.now() / 1000);\nconst reason = (data['delivery-status'] && data['delivery-status'].message) || data.reason || data.error || null;\nconst msgid = (data.message && data.message.headers && data.message.headers['message-id']) || null;\n\nreturn [{\n  json: {\n    valid,\n    event: data.event || 'unknown',\n    severity: data.severity || null,\n    token: vars.token || null,\n    sub_id: vars.sub_id || null,\n    doc_type: vars.doc_type || null,\n    msgid,\n    recipient: data.recipient || null,\n    reason,\n    event_ts_iso: new Date(event_ts_epoch * 1000).toISOString(),\n    event_ts_epoch\n  }\n}];"
+      },
+      "id": "1ae4f558-b463-417c-9dd1-69f4ad57903f",
+      "name": "02 · Code · Verify HMAC & Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        544
+      ],
+      "notes": "Pure JS. Verifies HMAC-SHA256(timestamp+token) signature against Mailgun signing key. Parses event-data into a flat object with token, event, timestamp, reason. REPLACE SIGNING_KEY const before activating."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "20273815-bcf8-4d22-bf18-3b454c669537",
+      "name": "03 · IF · Signed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'invalid_signature' } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "9bc736d4-541e-4759-a2f9-cf7d3185bbd4",
+      "name": "03b · Respond · 401 Unsigned",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r-delivered",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "delivered",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r-opened",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "opened",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r-clicked",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "clicked",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r-failed",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r-complained",
+                    "leftValue": "={{ $json.event }}",
+                    "rightValue": "complained",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "fcec63b9-16b2-46df-8445-dab22b74de69",
+      "name": "04 · Switch · Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -208,
+        352
+      ],
+      "notes": "Routes by event-data.event. 5 named outputs + fallback for unhandled types (unsubscribed, accepted, rejected/by-mailgun, etc). Fallback flows to Respond 200 — we ack but don't act."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE document_collection_log\nSET delivered_at = COALESCE(delivered_at, $1::timestamptz),\n    status = CASE WHEN status IN ('queued','sent') THEN 'delivered' ELSE status END,\n    email_message_id = COALESCE(email_message_id, NULLIF($2,'null')),\n    updated_at = now()\nWHERE token = NULLIF($3, 'null')::uuid\nRETURNING id, status;",
+        "options": {
+          "queryReplacement": "={{ $json.event_ts_iso }},{{ $json.msgid }},{{ $json.token }}"
+        }
+      },
+      "id": "307741e4-46d9-496e-8bfb-71ada7e3f26f",
+      "name": "05a · Postgres · Mark Delivered",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "COALESCE on delivered_at: first-write-wins (Mailgun retries duplicate events). Status CASE: only upgrade from queued/sent — never downgrade an opened/clicked row."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE document_collection_log\nSET opened_at = COALESCE(opened_at, $1::timestamptz),\n    status = CASE WHEN status IN ('queued','sent','delivered') THEN 'opened' ELSE status END,\n    updated_at = now()\nWHERE token = NULLIF($2, 'null')::uuid\nRETURNING id, status;",
+        "options": {
+          "queryReplacement": "={{ $json.event_ts_iso }},{{ $json.token }}"
+        }
+      },
+      "id": "930709fd-6f80-48c0-b773-3cc0b303f398",
+      "name": "05b · Postgres · Mark Opened",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        192
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE document_collection_log\nSET clicked_at = COALESCE(clicked_at, $1::timestamptz),\n    status = CASE WHEN status IN ('queued','sent','delivered','opened') THEN 'clicked' ELSE status END,\n    updated_at = now()\nWHERE token = NULLIF($2, 'null')::uuid\nRETURNING id, status;",
+        "options": {
+          "queryReplacement": "={{ $json.event_ts_iso }},{{ $json.token }}"
+        }
+      },
+      "id": "e5ace673-1580-4d0b-aa1d-85519cf2e3c8",
+      "name": "05c · Postgres · Mark Clicked",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        96,
+        368
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE document_collection_log\nSET rejected_at = COALESCE(rejected_at, $1::timestamptz),\n    rejection_reason = COALESCE(rejection_reason, $2::text),\n    status = 'bounced',\n    updated_at = now()\nWHERE token = NULLIF($3, 'null')::uuid\nRETURNING id, subcontractor_id, email_to, rejection_reason;",
+        "options": {
+          "queryReplacement": "={{ $json.event_ts_iso }},{{ $json.reason }},{{ $json.token }}"
+        }
+      },
+      "id": "bfe00091-9ecc-4838-ae48-a4955e200789",
+      "name": "05d · Postgres · Mark Bounced",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        16,
+        656
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Mailgun emits both permanent (hard bounce) and temporary (soft bounce/deferral) 'failed' events. severity field on the parsed JSON distinguishes them. Conservative choice: always mark bounced, store reason, let downstream cleanup logic decide whether to retry."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE document_collection_log\nSET rejected_at = COALESCE(rejected_at, $1::timestamptz),\n    rejection_reason = 'spam_complaint',\n    status = 'rejected',\n    updated_at = now()\nWHERE token = NULLIF($2, 'null')::uuid\nRETURNING id, subcontractor_id, email_to;",
+        "options": {
+          "queryReplacement": "={{ $json.event_ts_iso }},{{ $json.token }}"
+        }
+      },
+      "id": "81dc36f0-760f-4e13-bf2f-312f386d5fd6",
+      "name": "05e · Postgres · Mark Complained",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        16,
+        848
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Spam complaint is a brand-reputation event. Always alert Slack. Consider auto-suppressing this email_to address from future sends — handled by separate compliance workflow."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://hooks.slack.com/services/REDACTED",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  text: ($('02 · Code · Verify HMAC & Parse').item.json.event === 'complained' ? ':rotating_light: SPAM COMPLAINT' : ':warning: EMAIL BOUNCED'),\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: ($('02 · Code · Verify HMAC & Parse').item.json.event === 'complained' ? '🚨 Spam complaint' : '⚠️ Email bounced') } },\n    { type: 'section', fields: [\n        { type: 'mrkdwn', text: '*Recipient:* ' + ($('02 · Code · Verify HMAC & Parse').item.json.recipient || 'unknown') },\n        { type: 'mrkdwn', text: '*Doc type:* ' + ($('02 · Code · Verify HMAC & Parse').item.json.doc_type || 'unknown') },\n        { type: 'mrkdwn', text: '*Token:* ' + ($('02 · Code · Verify HMAC & Parse').item.json.token || 'unknown') },\n        { type: 'mrkdwn', text: '*Reason:* ' + ($('02 · Code · Verify HMAC & Parse').item.json.reason || 'no reason given') }\n    ]},\n    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Workflow 8b · Mailgun Events Receiver · ' + new Date().toISOString() }]}\n  ]\n}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "29887e74-5c03-4a3e-a726-93b4ba41e189",
+      "name": "06 · Slack · Bounce/Complaint Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        368,
+        704
+      ],
+      "notes": "Posts to #bfc-compliance-alerts via incoming webhook. Only fires from 05d (bounce) and 05e (complaint). Replace REPLACE_WITH_BFC_COMPLIANCE_ALERTS_WEBHOOK with the webhook URL from Slack app config."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, event: $('02 · Code · Verify HMAC & Parse').item.json.event, token: $('02 · Code · Verify HMAC & Parse').item.json.token } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ef62f577-50de-42cb-a56e-8697328b74f6",
+      "name": "07 · Respond · 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        608,
+        368
+      ],
+      "notes": "Required. Mailgun retries any event for 8 hours without a 2xx. If you remove this node, every event lands 5+ times and your log rows appear to flap."
+    }
+  ],
+  "connections": {
+    "01 · Webhook · Mailgun Events": {
+      "main": [
+        [
+          {
+            "node": "02 · Code · Verify HMAC & Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Code · Verify HMAC & Parse": {
+      "main": [
+        [
+          {
+            "node": "03 · IF · Signed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 · IF · Signed?": {
+      "main": [
+        [
+          {
+            "node": "04 · Switch · Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03b · Respond · 401 Unsigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 · Switch · Event Type": {
+      "main": [
+        [
+          {
+            "node": "05a · Postgres · Mark Delivered",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05b · Postgres · Mark Opened",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05c · Postgres · Mark Clicked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05d · Postgres · Mark Bounced",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05e · Postgres · Mark Complained",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "07 · Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05a · Postgres · Mark Delivered": {
+      "main": [
+        [
+          {
+            "node": "07 · Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05b · Postgres · Mark Opened": {
+      "main": [
+        [
+          {
+            "node": "07 · Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05c · Postgres · Mark Clicked": {
+      "main": [
+        [
+          {
+            "node": "07 · Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05d · Postgres · Mark Bounced": {
+      "main": [
+        [
+          {
+            "node": "06 · Slack · Bounce/Complaint Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05e · Postgres · Mark Complained": {
+      "main": [
+        [
+          {
+            "node": "06 · Slack · Bounce/Complaint Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 · Slack · Bounce/Complaint Alert": {
+      "main": [
+        [
+          {
+            "node": "07 · Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true,
+    "errorWorkflow": "ylOdF4oZn4lgMqON"
+  },
+  "active": true,
+  "_id": "WHX2en7EQGptHhtU",
+  "_tags": [
+    "bfc-prod",
+    "bfc-sub"
+  ]
+}

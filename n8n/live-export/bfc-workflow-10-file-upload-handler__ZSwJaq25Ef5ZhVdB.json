@@ -1,0 +1,490 @@
+{
+  "name": "BFC — Workflow 10 — File Upload Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds"
+            }
+          ]
+        }
+      },
+      "id": "738b34be-abf6-4d2e-b907-80b759190065",
+      "name": "01 · Schedule · Every 30s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1808,
+        112
+      ],
+      "notes": "Polls upload_completion_queue via v_upload_completion_pending view every 30s. Same cadence as Workflow 9 (verification dispatcher)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Claim up to 25 pending rows with FOR UPDATE SKIP LOCKED.\n-- Increments attempts atomically. View handles join to sub/GC context.\nWITH claimed AS (\n  SELECT q.id\n  FROM upload_completion_queue q\n  WHERE (q.slack_dispatched_at IS NULL OR q.confirmation_dispatched_at IS NULL)\n    AND q.attempts < 5\n  ORDER BY q.created_at ASC\n  LIMIT 25\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE upload_completion_queue q\nSET attempts = attempts + 1\nFROM claimed\nWHERE q.id = claimed.id\nRETURNING q.id;",
+        "options": {}
+      },
+      "id": "a524cf98-8628-4156-95e5-dd32cc376398",
+      "name": "02 · Postgres · Claim Pending Uploads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1600,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Claim step. Atomic increment + lock. Returns 0 rows when queue is empty (short-circuits downstream)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Pull full context for the claimed row from the view.\nSELECT * FROM v_upload_completion_pending\nWHERE queue_id = NULLIF($1, 'null')::uuid;",
+        "options": {
+          "queryReplacement": "={{ $json.id }}"
+        }
+      },
+      "id": "ae6484d3-3c11-4fc5-bfd5-1ae70bdbab8a",
+      "name": "03 · Postgres · Fetch Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1408,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Hydrates the queue row with sub/GC details via the convenience view. Single SELECT."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-doc-label",
+              "name": "document_label",
+              "value": "={{ {cert:'Insurance Certificate', w9:'W-9 Form', lien_waiver:'Lien Waiver', other:'document'}[$json.document_type] || 'document' }}",
+              "type": "string"
+            },
+            {
+              "id": "a-doc-short",
+              "name": "document_label_short",
+              "value": "={{ {cert:'COI', w9:'W-9', lien_waiver:'lien waiver', other:'document'}[$json.document_type] || 'document' }}",
+              "type": "string"
+            },
+            {
+              "id": "a-gc-safe",
+              "name": "gc_name_safe",
+              "value": "={{ $json.gc_name || 'A general contractor' }}",
+              "type": "string"
+            },
+            {
+              "id": "a-first",
+              "name": "contact_first_name",
+              "value": "={{ ($json.sub_contact_name || '').split(' ')[0] || 'there' }}",
+              "type": "string"
+            },
+            {
+              "id": "a-storage-url",
+              "name": "storage_url",
+              "value": "=https://lsgtllwlgcleraokdyfe.supabase.co/storage/v1/object/sign/subcontractor-documents/{{ $json.uploaded_object_path }}",
+              "type": "string"
+            },
+            {
+              "id": "a-email-subject",
+              "name": "email_subject",
+              "value": "=We received your {{ {cert:'COI', w9:'W-9', lien_waiver:'lien waiver', other:'document'}[$json.document_type] || 'document' }}.",
+              "type": "string"
+            },
+            {
+              "id": "a-email-html",
+              "name": "email_html",
+              "value": "=<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#F4F4F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F4F4F0;padding:40px 20px;\"><tr><td align=\"center\"><table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#FFFFFF;border-radius:6px;overflow:hidden;\"><tr><td style=\"background:#07080B;padding:18px 28px;\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"width:30px;height:30px;background:#B8E532;border-radius:6px;text-align:center;vertical-align:middle;font-family:'Courier New',monospace;font-weight:700;color:#07080B;font-size:14pt;\">&gt;_</td><td style=\"padding-left:10px;color:#FFFFFF;font-weight:700;font-size:13pt;letter-spacing:-0.01em;\">Blackflowcode<span style=\"color:#B8E532;\">.ai</span></td></tr></table></td></tr><tr><td style=\"padding:32px 28px;\"><div style=\"font-family:'Courier New',monospace;font-size:9pt;color:#5E7B1F;text-transform:uppercase;letter-spacing:0.16em;margin-bottom:14px;\">DOCUMENT RECEIVED &middot; {{ $json.document_label_short.toUpperCase() }}</div><h1 style=\"margin:0 0 14px;font-size:22pt;letter-spacing:-0.01em;color:#07080B;\">Got it, {{ $json.contact_first_name }}.</h1><p style=\"margin:0 0 16px;font-size:11pt;line-height:1.55;color:#2A2F38;\">We received the {{ $json.document_label }} you uploaded for {{ $node['03 · Postgres · Fetch Context'].json.sub_name }} on behalf of {{ $node['03 · Postgres · Fetch Context'].json.gc_name_safe }}.</p><p style=\"margin:0 0 24px;font-size:11pt;line-height:1.55;color:#2A2F38;\">It&rsquo;s in compliance review now. We&rsquo;ll reach out if anything is missing &mdash; otherwise no further action needed from you.</p><div style=\"font-family:'Courier New',monospace;font-size:8.5pt;color:#5E7B1F;text-transform:uppercase;letter-spacing:0.14em;margin-bottom:6px;\">RECEIPT</div><table cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;background:#F6FAEC;border-left:3px solid #B8E532;border-radius:0 4px 4px 0;\"><tr><td style=\"padding:14px 16px;font-family:'Courier New',monospace;font-size:9.5pt;color:#07080B;\">Document: {{ $json.document_label }}<br/>Uploaded: {{ new Date($node['03 · Postgres · Fetch Context'].json.uploaded_at).toUTCString() }}<br/>Reference: {{ $node['03 · Postgres · Fetch Context'].json.token }}</td></tr></table></td></tr><tr><td style=\"background:#F6FAEC;padding:18px 28px;border-top:1px solid #ECEFF3;font-family:'Courier New',monospace;font-size:8.5pt;color:#5E7B1F;text-transform:uppercase;letter-spacing:0.14em;\">Blackflowcode.ai &middot; hello@blackflowcodeai.com &middot; 516.604.1804</td></tr></table></td></tr></table></body></html>",
+              "type": "string"
+            },
+            {
+              "id": "a-email-text",
+              "name": "email_text",
+              "value": "=Got it, {{ $json.contact_first_name }}.\n\nWe received the {{ $json.document_label }} you uploaded for {{ $node['03 · Postgres · Fetch Context'].json.sub_name }} on behalf of {{ $node['03 · Postgres · Fetch Context'].json.gc_name_safe }}.\n\nIt's in compliance review now. We'll reach out if anything is missing.\n\nReceipt:\n  Document: {{ $json.document_label }}\n  Uploaded: {{ new Date($node['03 · Postgres · Fetch Context'].json.uploaded_at).toUTCString() }}\n  Reference: {{ $node['03 · Postgres · Fetch Context'].json.token }}\n\n— Blackflowcode.ai · hello@blackflowcodeai.com · 516.604.1804",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cbe36c7f-7fe4-4eb4-8bbb-a165bb43aa3f",
+      "name": "04 · Set · Build Email + Slack Bodies",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1200,
+        112
+      ],
+      "notes": "Renders confirmation email (HTML + text) and helper variables. References Node 03 directly for sub_name/gc_name_safe/token to keep template legible."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REDACTED",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  text: '📥 ' + $node['03 · Postgres · Fetch Context'].json.sub_name + ' uploaded a ' + $json.document_label,\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: '📥 Document received' } },\n    { type: 'section', fields: [\n      { type: 'mrkdwn', text: '*Subcontractor:*\\n' + $node['03 · Postgres · Fetch Context'].json.sub_name },\n      { type: 'mrkdwn', text: '*Document:*\\n' + $json.document_label },\n      { type: 'mrkdwn', text: '*GC:*\\n' + $json.gc_name_safe },\n      { type: 'mrkdwn', text: '*Uploaded:*\\n' + new Date($node['03 · Postgres · Fetch Context'].json.uploaded_at).toISOString() }\n    ]},\n    { type: 'section', text: { type: 'mrkdwn', text: '*File:*  `' + ($node['03 · Postgres · Fetch Context'].json.uploaded_object_path || 'unknown') + '`' } },\n    { type: 'context', elements: [\n      { type: 'mrkdwn', text: 'Token  `' + $node['03 · Postgres · Fetch Context'].json.token + '`  •  Workflow 10  •  ' + new Date().toISOString() }\n    ]}\n  ]\n}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "0def1fb3-c4ae-4b76-995b-1efb379e038b",
+      "name": "05 · Slack · GC Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1008,
+        112
+      ],
+      "notes": "Posts to #bfc-compliance-alerts via incoming webhook. REPLACE placeholder URL with the rotated webhook URL stored in Vaultwarden as 'Slack · bfc-compliance-alerts webhook'."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE upload_completion_queue\nSET slack_dispatched_at = now()\nWHERE id = NULLIF($1, 'null')::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('02 · Postgres · Claim Pending Uploads').item.json.id }}"
+        }
+      },
+      "id": "014faae4-80c0-4fb1-905d-9a723c306ece",
+      "name": "06 · Postgres · Mark Slack Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -800,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mailgun.net/v3/notifications.blackflowcodeai.com/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mailgunApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "from",
+              "value": "Blackflowcode <notifications@notifications.blackflowcodeai.com>"
+            },
+            {
+              "name": "to",
+              "value": "={{ $('03 · Postgres · Fetch Context').item.json.sub_contact_email }}"
+            },
+            {
+              "name": "h:Reply-To",
+              "value": "hello@blackflowcodeai.com"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $('04 · Set · Build Email + Slack Bodies').item.json.email_subject }}"
+            },
+            {
+              "name": "html",
+              "value": "={{ $('04 · Set · Build Email + Slack Bodies').item.json.email_html }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $('04 · Set · Build Email + Slack Bodies').item.json.email_text }}"
+            },
+            {
+              "name": "o:tag",
+              "value": "bfc-sub"
+            },
+            {
+              "name": "o:tag",
+              "value": "upload-confirmation"
+            },
+            {
+              "name": "o:tracking-opens",
+              "value": "yes"
+            },
+            {
+              "name": "o:tracking-clicks",
+              "value": "no"
+            },
+            {
+              "name": "v:token",
+              "value": "={{ $('03 · Postgres · Fetch Context').item.json.token }}"
+            },
+            {
+              "name": "v:queue_id",
+              "value": "={{ $('02 · Postgres · Claim Pending Uploads').item.json.id }}"
+            },
+            {
+              "name": "v:doc_type",
+              "value": "={{ $('03 · Postgres · Fetch Context').item.json.document_type }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "0ddf6892-a925-4492-9c6a-ed8d62a1de06",
+      "name": "07 · HTTP · Mailgun Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -608,
+        112
+      ],
+      "credentials": {
+        "mailgunApi": {
+          "id": "7vh4hZcq2pjM5NcG",
+          "name": "Production Notification"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE upload_completion_queue\nSET confirmation_dispatched_at = now(),\n    last_error = NULL\nWHERE id = NULLIF($1, 'null')::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('02 · Postgres · Claim Pending Uploads').item.json.id }}"
+        }
+      },
+      "id": "21b8900c-1387-47d7-ac5a-279aceb6d7eb",
+      "name": "08 · Postgres · Mark Confirmation Sent",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -400,
+        112
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c-is-cert",
+              "leftValue": "={{ $('03 · Postgres · Fetch Context').item.json.document_type }}",
+              "rightValue": "cert",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4e845da5-32ac-4511-a298-002ed1a5bd99",
+      "name": "09 · IF · Is Certificate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO subcontractor_certificates\n  (subcontractor_id, cert_type, policy_number, expiration_date, file_url, status, uploaded_at)\nVALUES (\n  NULLIF($1, 'null')::uuid,\n  'general_liability',\n  'PENDING_OCR',\n  (NULLIF($2, 'null')::timestamptz)::date + interval '1 year',\n  $3::text,\n  'pending_review',\n  NULLIF($2, 'null')::timestamptz\n)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('03 · Postgres · Fetch Context').item.json.subcontractor_id }},general_liability,{{ $('03 · Postgres · Fetch Context').item.json.uploaded_at }},{{ $('04 · Set · Build Email + Slack Bodies').item.json.storage_url }}"
+        }
+      },
+      "id": "2c1f3ab5-bd45-4605-9895-5bc7ba134805",
+      "name": "10 · Postgres · Cert Stub Row",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "ONLY runs when document_type='cert'. Inserts placeholder row with policy_number='PENDING_OCR', expiration_date=upload_date+1yr, status='pending_review'. Future OCR workflow updates these fields in place."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE upload_completion_queue\nSET cert_stub_created_at = now()\nWHERE id = NULLIF($1, 'null')::uuid\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('02 · Postgres · Claim Pending Uploads').item.json.id }}"
+        }
+      },
+      "id": "4ad0e1b3-5c9d-42aa-9402-a4a388f7471f",
+      "name": "11 · Postgres · Mark Cert Stub Created",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        208,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "01 · Schedule · Every 30s": {
+      "main": [
+        [
+          {
+            "node": "02 · Postgres · Claim Pending Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Postgres · Claim Pending Uploads": {
+      "main": [
+        [
+          {
+            "node": "03 · Postgres · Fetch Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 · Postgres · Fetch Context": {
+      "main": [
+        [
+          {
+            "node": "04 · Set · Build Email + Slack Bodies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 · Set · Build Email + Slack Bodies": {
+      "main": [
+        [
+          {
+            "node": "05 · Slack · GC Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 · Slack · GC Notify": {
+      "main": [
+        [
+          {
+            "node": "06 · Postgres · Mark Slack Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 · Postgres · Mark Slack Sent": {
+      "main": [
+        [
+          {
+            "node": "07 · HTTP · Mailgun Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 · HTTP · Mailgun Confirmation": {
+      "main": [
+        [
+          {
+            "node": "08 · Postgres · Mark Confirmation Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 · Postgres · Mark Confirmation Sent": {
+      "main": [
+        [
+          {
+            "node": "09 · IF · Is Certificate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 · IF · Is Certificate?": {
+      "main": [
+        [
+          {
+            "node": "10 · Postgres · Cert Stub Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 · Postgres · Cert Stub Row": {
+      "main": [
+        [
+          {
+            "node": "11 · Postgres · Mark Cert Stub Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ylOdF4oZn4lgMqON"
+  },
+  "active": true,
+  "_id": "ZSwJaq25Ef5ZhVdB",
+  "_tags": [
+    "bfc-prod",
+    "bfc-sub"
+  ]
+}

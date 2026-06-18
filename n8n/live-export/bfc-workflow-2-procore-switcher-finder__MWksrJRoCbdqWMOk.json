@@ -1,0 +1,293 @@
+{
+  "name": "BFC - Workflow 2 - Procore Switcher Finder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "node-cron-procore",
+      "name": "Every Monday 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id AS sub_id, s.company_name, s.trade_type, s.city, s.state, s.contact_email, s.contact_phone, g.company_name AS gc_name, gsr.procore_connected, gsr.last_worked FROM gc_subcontractor_relationships gsr JOIN subcontractors s ON s.id = gsr.subcontractor_id JOIN gc_companies g ON g.id = gsr.gc_id WHERE gsr.procore_connected = false AND gsr.total_contract_value > 50000 AND gsr.status = 'active' ORDER BY gsr.total_contract_value DESC LIMIT 20",
+        "options": {}
+      },
+      "id": "node-pg-procore",
+      "name": "Find Non-Procore Subs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-has-subs",
+              "leftValue": "={{ $json.company_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-procore",
+      "name": "Has Switchers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const d = item.json;\n  \n  // Calculate switcher score based on contract value and activity\n  let score = 5; // base score for Procore non-users\n  \n  results.push({\n    json: {\n      company_name: d.company_name,\n      trade_type: d.trade_type,\n      city: d.city,\n      state: d.state,\n      contact_email: d.contact_email || '',\n      contact_phone: d.contact_phone || '',\n      gc_name: d.gc_name,\n      procore_connected: d.procore_connected,\n      last_worked: d.last_worked,\n      switcher_score: score,\n      source: 'Procore Switcher',\n      status: 'New',\n      sub_id: d.sub_id,\n      week_of: new Date().toISOString().split('T')[0]\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "node-code-procore",
+      "name": "Score Switchers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "341d9016-ebd2-4b4a-99e8-f7713c27bb58",
+          "mode": "id"
+        },
+        "title": "={{ $json.company_name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Source",
+              "type": "select",
+              "selectValue": "Switcher"
+            },
+            {
+              "key": "Status",
+              "type": "select",
+              "selectValue": "New"
+            },
+            {
+              "key": "Urgency",
+              "type": "number",
+              "numberValue": "={{ $json.switcher_score }}"
+            },
+            {
+              "key": "Trade Type",
+              "type": "richText",
+              "textValue": "={{ $json.trade_type }}"
+            },
+            {
+              "key": "Location",
+              "type": "richText",
+              "textValue": "={{ $json.city }}, {{ $json.state }}"
+            },
+            {
+              "key": "GC Name",
+              "type": "richText",
+              "textValue": "={{ $json.gc_name }}"
+            },
+            {
+              "key": "Contact Email",
+              "type": "richText",
+              "textValue": "={{ $json.contact_email }}"
+            },
+            {
+              "key": "Supabase ID",
+              "type": "richText",
+              "textValue": "={{ $json.sub_id }}"
+            }
+          ]
+        }
+      },
+      "id": "node-notion-procore",
+      "name": "Add Switchers to Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        240
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "OT70yoshzZedthfT",
+          "name": "Notion account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=📊 *Weekly Procore Switcher Report — {{ $now.toFormat('yyyy-MM-dd') }}*\n\nFound *{{ $input.all().length }}* potential Procore switchers this week.\n\nTop targets added to Notion Sales Leads 👉 Review and assign outreach.\n\n_Source: Supabase gc_subcontractor_relationships — procore_connected = false_\n_Schedule: Every Monday 9 AM_",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AVDB0S7TL"
+        },
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-procore",
+      "name": "Slack - Weekly Switcher Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1340,
+        240
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "55884121-40a8-418b-93df-644480e88e42"
+    },
+    {
+      "parameters": {
+        "text": "=📊 *Weekly Procore Switcher Report — {{ $now.toFormat('yyyy-MM-dd') }}*\n\n_No new switcher candidates found this week._\n\nAll active subcontractors either have Procore connected or contract value below threshold.",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0AVDB0S7TL"
+        },
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-no-switchers",
+      "name": "Slack - No Switchers Found",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        900,
+        420
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "346d9deb-407e-4541-8b4b-c0eeecdc2052"
+    }
+  ],
+  "connections": {
+    "Every Monday 9 AM": {
+      "main": [
+        [
+          {
+            "node": "Find Non-Procore Subs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Non-Procore Subs": {
+      "main": [
+        [
+          {
+            "node": "Has Switchers?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Switchers?": {
+      "main": [
+        [
+          {
+            "node": "Score Switchers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - No Switchers Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Switchers": {
+      "main": [
+        [
+          {
+            "node": "Add Switchers to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Switchers to Notion": {
+      "main": [
+        [
+          {
+            "node": "Slack - Weekly Switcher Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "active": false,
+  "_id": "MWksrJRoCbdqWMOk",
+  "_tags": []
+}

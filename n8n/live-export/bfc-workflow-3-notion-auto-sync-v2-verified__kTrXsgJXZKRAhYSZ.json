@@ -1,0 +1,458 @@
+{
+  "name": "BFC - Workflow 3 - Notion Auto-Sync (v2): Verified",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "node-cron",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT supabase_id, company_name, trade_type, alert_level, violation_count, urgency, compliance_tier, total_fines, to_char(last_violation_date, 'YYYY-MM-DD') AS last_violation_date, gc_name, location, trigger_reason, contact_email FROM public.vw_sales_leads_sync;",
+        "options": {}
+      },
+      "id": "node-pg-fetch",
+      "name": "Fetch Source (vw_sales_leads_sync)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        464,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Reads the deployed view that produces one row per sub with active alerts. View definition in SOP §4 (notion.so/35636f801d3f815b9f3ec8dca635507e). Replace if column mapping changes — never embed query logic in this node."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all Postgres rows into a single item so downstream Notion fetch runs ONCE.\nconst rows = $input.all().map(i => i.json);\nreturn [{ json: { source_rows: rows, source_count: rows.length } }];"
+      },
+      "id": "node-bundle-source",
+      "name": "Bundle Source Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "3d0a716d-3c67-4302-a998-b503dd3247d2",
+          "mode": "list",
+          "cachedResultName": "📋 Sales Leads — BFC Compliance",
+          "cachedResultUrl": "https://www.notion.so/3d0a716d3c674302a998b503dd3247d2"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "node-notion-getall",
+      "name": "Get Existing Notion Rows",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        400
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "70qG4MthaFmLBKJa",
+          "name": "Notion SalesLead DB"
+        }
+      },
+      "notes": "Returns ALL pages in the Sales Leads DB. The Classify node filters in code to Source=Supabase Sync. Avoids brittle Notion API filter syntax."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get source rows from Bundle node\nconst sourceRows = $('Bundle Source Rows').first().json.source_rows;\n\n// Get existing Notion rows from previous node  \nconst notionPages = $input.all();\n\n// Build dedup map — handles both n8n flat format AND raw Notion API nested format\nconst notionMap = new Map();\n\nfor (const item of notionPages) {\n  const data = item.json;\n  \n  const sourceVal = data.Source?.select?.name \n                 ?? data.Source \n                 ?? data.properties?.Source?.select?.name;\n  \n  if (sourceVal !== 'Supabase Sync') continue;\n  \n  const supId = data['Supabase ID']?.rich_text?.[0]?.plain_text\n             ?? data['Supabase ID']\n             ?? data.properties?.['Supabase ID']?.rich_text?.[0]?.plain_text;\n  \n  if (!supId) continue;\n  \n  notionMap.set(String(supId).trim(), {\n    pageId: data.id || data.url\n  });\n}\n\nconsole.log(`Notion dedup map: ${notionMap.size} existing Supabase Sync rows found`);\nconsole.log('Map keys:', [...notionMap.keys()]);\nconsole.log(`Source rows from Supabase: ${sourceRows.length}`);\n\n// Classify each source row\nconst classified = sourceRows.map(row => {\n  const supId = String(row.supabase_id).trim();\n  const existing = notionMap.get(supId);\n  \n  return {\n    json: {\n      op: existing ? 'update' : 'create',\n      notion_page_id: existing?.pageId || null,\n      supabase_id: supId,\n      company_name: row.company_name || 'Unknown',\n      trade_type: row.trade_type || '',\n      alert_level: Number(row.alert_level) || 1,\n      violation_count: Number(row.violation_count) || 0,\n      urgency: Number(row.urgency) || 0,\n      compliance_tier: row.compliance_tier || 'standard',\n      total_fines: Number(row.total_fines) || 0,\n      last_violation_date: row.last_violation_date || null,\n      gc_name: row.gc_name || '',\n      location: row.location || '',\n      trigger_reason: row.trigger_reason || 'No active trigger',\n      contact_email: row.contact_email || '',\n      synced_at: new Date().toISOString().split('T')[0]\n    }\n  };\n});\n\nconst creates = classified.filter(c => c.json.op === 'create').length;\nconst updates = classified.filter(c => c.json.op === 'update').length;\nconsole.log(`Classified: ${creates} CREATE, ${updates} UPDATE`);\n\nreturn classified;"
+      },
+      "id": "node-classify",
+      "name": "Classify (Create vs Update)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-op-create",
+              "leftValue": "={{ $json.op }}",
+              "rightValue": "create",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "node-if-op",
+      "name": "Op = Create?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "databaseId": {
+          "__rl": true,
+          "value": "3d0a716d-3c67-4302-a998-b503dd3247d2",
+          "mode": "list",
+          "cachedResultName": "📋 Sales Leads — BFC Compliance",
+          "cachedResultUrl": "https://www.notion.so/3d0a716d3c674302a998b503dd3247d2"
+        }
+      },
+      "id": "node-notion-update",
+      "name": "Notion Update",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1728,
+        544
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "70qG4MthaFmLBKJa",
+          "name": "Notion SalesLead DB"
+        }
+      },
+      "notes": "UPDATE branch — sets 12 properties only. NEVER touches Status, Notes, Source, Supabase ID, Company Name. These are set on create or owned by operators."
+    },
+    {
+      "parameters": {},
+      "id": "node-merge-end",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "3d0a716d-3c67-4302-a998-b503dd3247d2",
+          "mode": "id"
+        },
+        "title": "={{ $json.company_name }}",
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Trade Type|rich_text",
+              "textContent": "={{ $json.trade_type }}"
+            },
+            {
+              "key": "Alert Level|number",
+              "numberValue": "={{ $json.alert_level }}"
+            },
+            {
+              "key": "Violation Count|number",
+              "numberValue": "={{ $json.violation_count }}"
+            },
+            {
+              "key": "Urgency|number",
+              "numberValue": "={{ $json.urgency }}"
+            },
+            {
+              "key": "Compliance Tier|select",
+              "selectValue": "={{ $json.compliance_tier }}"
+            },
+            {
+              "key": "Total Fines|number",
+              "numberValue": "={{ $json.total_fines }}"
+            },
+            {
+              "key": "Last Violation Date|date",
+              "includeTime": false,
+              "date": "={{ $json.last_violation_date }}"
+            },
+            {
+              "key": "GC Name|rich_text",
+              "textContent": "={{ $json.gc_name }}"
+            },
+            {
+              "key": "Location|rich_text",
+              "textContent": "={{ $json.location }}"
+            },
+            {
+              "key": "Trigger Reason|rich_text",
+              "textContent": "={{ $json.trigger_reason }}"
+            },
+            {
+              "key": "Contact Email|email",
+              "emailValue": "={{ $json.contact_email }}"
+            },
+            {
+              "key": "Supabase ID|rich_text",
+              "textContent": "={{ $json.supabase_id }}"
+            },
+            {
+              "key": "Synced At|date",
+              "includeTime": false,
+              "date": "={{ $json.synced_at }}"
+            },
+            {
+              "key": "Source|select",
+              "selectValue": "Supabase Sync"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "New"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d45a10c6-4b6b-43ad-9226-587cc3d51098",
+      "name": "Notion Create",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1744,
+        352
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "70qG4MthaFmLBKJa",
+          "name": "Notion SalesLead DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.notion_page_id }}",
+          "mode": "id"
+        },
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Trade Type|rich_text",
+              "textContent": "={{ $json.trade_type }}"
+            },
+            {
+              "key": "Alert Level|number",
+              "numberValue": "={{ $json.alert_level }}"
+            },
+            {
+              "key": "Violation Count|number",
+              "numberValue": "={{ $json.violation_count }}"
+            },
+            {
+              "key": "Urgency|number",
+              "numberValue": "={{ $json.urgency }}"
+            },
+            {
+              "key": "Compliance Tier|select",
+              "selectValue": "={{ $json.compliance_tier }}"
+            },
+            {
+              "key": "Total Fines|number",
+              "numberValue": "={{ $json.total_fines }}"
+            },
+            {
+              "key": "Last Violation Date|date",
+              "includeTime": false,
+              "date": "={{ $json.last_violation_date }}"
+            },
+            {
+              "key": "GC Name|rich_text",
+              "textContent": "={{ $json.gc_name }}"
+            },
+            {
+              "key": "Location|rich_text",
+              "textContent": "={{ $json.location }}"
+            },
+            {
+              "key": "Trigger Reason|rich_text",
+              "textContent": "={{ $json.trigger_reason }}"
+            },
+            {
+              "key": "Contact Email|email",
+              "emailValue": "={{ $json.contact_email }}"
+            },
+            {
+              "key": "Synced At|date",
+              "includeTime": false,
+              "date": "={{ $json.synced_at }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "709ae4ee-d460-4533-8382-364c652d5c52",
+      "name": "Notion Update1",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        2112,
+        832
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "OT70yoshzZedthfT",
+          "name": "Notion account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Source (vw_sales_leads_sync)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Source (vw_sales_leads_sync)": {
+      "main": [
+        [
+          {
+            "node": "Bundle Source Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bundle Source Rows": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Notion Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Notion Rows": {
+      "main": [
+        [
+          {
+            "node": "Classify (Create vs Update)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify (Create vs Update)": {
+      "main": [
+        [
+          {
+            "node": "Op = Create?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Op = Create?": {
+      "main": [
+        [
+          {
+            "node": "Notion Create",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Update": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Create": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "ylOdF4oZn4lgMqON",
+    "binaryMode": "separate"
+  },
+  "active": false,
+  "_id": "kTrXsgJXZKRAhYSZ",
+  "_tags": [
+    "notion-sync",
+    "system-2",
+    "bfc-compliance"
+  ]
+}

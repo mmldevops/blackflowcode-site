@@ -1,0 +1,252 @@
+{
+  "id": "bfc-workflow-13-osha-ingestion",
+  "name": "BFC — Workflow 13 — OSHA Violation Ingestion",
+  "active": false,
+  "nodes": [
+    {
+      "id": "node-schedule",
+      "name": "Daily 6 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 6 * * *" }]
+        }
+      }
+    },
+    {
+      "id": "node-get-watermark",
+      "name": "Get Watermark",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 300],
+      "credentials": { "postgres": { "id": "egOLTpUjmoIDA785", "name": "supabase-postgres" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT workflow_id, last_run_at, rows_synced FROM sync_state WHERE workflow_id = 'wf13';"
+      }
+    },
+    {
+      "id": "node-set-params",
+      "name": "Set Fetch Params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const watermark = $('Get Watermark').first().json;\nconst lastRunAt = watermark?.last_run_at\n  ? new Date(watermark.last_run_at)\n  : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);\nconst since = lastRunAt.toISOString().split('T')[0];\nreturn [{ json: { since, lastRunAt: lastRunAt.toISOString(), limit: 500 } }];"
+      }
+    },
+    {
+      "id": "node-fetch-inspections",
+      "name": "Fetch Inspections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "https://apiprod.dol.gov/v4/get/OSHA/inspection/json",
+        "sendHeaders": false,
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "X-API-KEY", "value": "={{ $env.OSHA_API_KEY }}" },
+            { "name": "limit", "value": "={{ $json.limit }}" }
+          ]
+        },
+        "options": { "response": { "response": { "fullResponse": false } } }
+      }
+    },
+    {
+      "id": "node-filter-inspections",
+      "name": "Filter Inspections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// apiprod.dol.gov/v4 returns { data: [...] }\n// Field-level API filters are not supported — filter client-side\nconst raw = $input.first().json;\nconst allRows = Array.isArray(raw?.data) ? raw.data : (Array.isArray(raw) ? raw : []);\n\nconst since = new Date($('Set Fetch Params').first().json.lastRunAt);\n\nconst inspections = allRows.filter(r => {\n  const naics = String(r.naics_code ?? '');\n  const isConstruction = naics.startsWith('23') || r.safety_const === 'X';\n  const openDate = r.open_date ? new Date(r.open_date) : null;\n  const isNew = openDate && openDate > since;\n  return isConstruction && isNew;\n});\n\nif (!inspections.length) {\n  return [{ json: { _no_results: true, total_fetched: allRows.length } }];\n}\n\n// Return ONE item with the full inspection list so the next node runs once\nreturn [{ json: { inspections, activity_nrs: inspections.map(r => r.activity_nr) } }];"
+      }
+    },
+    {
+      "id": "node-check-results",
+      "name": "Any Results?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{
+            "id": "cond-has-data",
+            "leftValue": "={{ $json._no_results ? 0 : 1 }}",
+            "rightValue": 0,
+            "operator": { "type": "number", "operation": "gt" }
+          }],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-fetch-violations",
+      "name": "Fetch Violations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 200],
+      "parameters": {
+        "method": "GET",
+        "url": "https://apiprod.dol.gov/v4/get/OSHA/violation/json",
+        "sendHeaders": false,
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "X-API-KEY", "value": "={{ $env.OSHA_API_KEY }}" },
+            { "name": "limit", "value": "500" }
+          ]
+        },
+        "options": { "response": { "response": { "fullResponse": false } } }
+      }
+    },
+    {
+      "id": "node-join-enrich",
+      "name": "Join & Enrich",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 200],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Inspections from Filter Inspections node (one item with array)\nconst inspections = $('Filter Inspections').first().json.inspections || [];\nconst targetIds = new Set(inspections.map(r => String(r.activity_nr)));\n\n// Violations from current input\nconst violRaw = $input.first().json;\nconst allViols = Array.isArray(violRaw?.data) ? violRaw.data : [];\n\n// Group violations by activity_nr — only for our inspections\n// viol_type: S=serious, W=willful, R=repeat, O=other\nconst violMap = {};\nfor (const v of allViols) {\n  const key = String(v.activity_nr);\n  if (!targetIds.has(key)) continue;\n  if (!violMap[key]) violMap[key] = { serious:0, willful:0, repeat:0, other:0, initial:0, current:0 };\n  const t = String(v.viol_type ?? '').toUpperCase();\n  if (t === 'S') violMap[key].serious++;\n  else if (t === 'W') violMap[key].willful++;\n  else if (t === 'R') violMap[key].repeat++;\n  else violMap[key].other++;\n  violMap[key].initial  += parseFloat(v.initial_penalty  ?? 0) || 0;\n  violMap[key].current  += parseFloat(v.current_penalty  ?? 0) || 0;\n}\n\n// Merge and return one item per inspection\nreturn inspections.map(r => {\n  const key = String(r.activity_nr);\n  const v = violMap[key] || {};\n  return {\n    json: {\n      inspection_id:      String(r.activity_nr ?? '').trim(),\n      establishment_name: String(r.estab_name  ?? '').trim(),\n      inspection_date:    r.open_date ? r.open_date.split('T')[0] : null,\n      naics:              String(r.naics_code ?? '').trim() || null,\n      naics_description:  null,\n      city:               r.site_city  ?? null,\n      state:              r.site_state ?? null,\n      zip:                r.site_zip   ?? null,\n      penalty_initial:    v.initial || null,\n      penalty_current:    v.current || null,\n      citations_serious:  v.serious || 0,\n      citations_willful:  v.willful || 0,\n      citations_repeat:   v.repeat  || 0,\n      citations_other:    v.other   || 0,\n      raw_payload:        JSON.stringify(r)\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "node-upsert",
+      "name": "Upsert osha_violations",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2000, 200],
+      "credentials": { "postgres": { "id": "egOLTpUjmoIDA785", "name": "supabase-postgres" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.osha_violations (\n  inspection_id, establishment_name, inspection_date,\n  naics, naics_description, city, state, zip,\n  penalty_initial, penalty_current,\n  citations_serious, citations_willful, citations_repeat, citations_other,\n  raw_payload\n) VALUES (\n  '{{ $json.inspection_id }}',\n  '{{ $json.establishment_name.replace(/'/g, \"''\") }}',\n  {{ $json.inspection_date ? \"'\" + $json.inspection_date + \"'\" : 'NULL' }},\n  {{ $json.naics ? \"'\" + $json.naics + \"'\" : 'NULL' }},\n  NULL,\n  {{ $json.city  ? \"'\" + $json.city.replace(/'/g, \"''\")  + \"'\" : 'NULL' }},\n  {{ $json.state ? \"'\" + $json.state + \"'\" : 'NULL' }},\n  {{ $json.zip   ? \"'\" + $json.zip   + \"'\" : 'NULL' }},\n  {{ $json.penalty_initial ?? 'NULL' }},\n  {{ $json.penalty_current ?? 'NULL' }},\n  {{ $json.citations_serious ?? 0 }},\n  {{ $json.citations_willful ?? 0 }},\n  {{ $json.citations_repeat  ?? 0 }},\n  {{ $json.citations_other   ?? 0 }},\n  '{{ $json.raw_payload.replace(/'/g, \"''\") }}'::jsonb\n)\nON CONFLICT (inspection_id) DO NOTHING\nRETURNING id;"
+      }
+    },
+    {
+      "id": "node-filter-new",
+      "name": "New Rows Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 1,
+      "position": [2220, 200],
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $json.id }}", "operation": "isNotEmpty" }]
+        }
+      }
+    },
+    {
+      "id": "node-promote",
+      "name": "promote_osha_to_lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2440, 200],
+      "credentials": { "postgres": { "id": "egOLTpUjmoIDA785", "name": "supabase-postgres" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT promote_osha_to_lead('{{ $json.id }}'::uuid) AS result;"
+      }
+    },
+    {
+      "id": "node-count",
+      "name": "Count Synced",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2660, 200],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst rowsSynced = items.length;\nconst promoted = items.filter(i => {\n  try { return JSON.parse(i.json?.result ?? '{}')?.ok === true; } catch { return false; }\n}).length;\nreturn [{ json: { rows_synced: rowsSynced, promoted } }];"
+      }
+    },
+    {
+      "id": "node-update-watermark",
+      "name": "Update sync_state",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2880, 200],
+      "credentials": { "postgres": { "id": "egOLTpUjmoIDA785", "name": "supabase-postgres" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.sync_state\nSET last_run_at = NOW(), rows_synced = {{ $json.rows_synced }}, last_error = NULL, updated_at = NOW()\nWHERE workflow_id = 'wf13'\nRETURNING workflow_id, last_run_at, rows_synced;"
+      }
+    },
+    {
+      "id": "node-slack-ok",
+      "name": "Slack — Import Done",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [3100, 200],
+      "credentials": { "slackOAuth2Api": { "name": "Slack account" } },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "id", "value": "C0AVDB0S7TL" },
+        "text": "=✅ *WF13 — OSHA Import Complete*\nInserted *{{ $('Count Synced').first().json.rows_synced }}* inspections · *{{ $('Count Synced').first().json.promoted }}* promoted to leads\n_{{ $now.toISO() }}_"
+      }
+    },
+    {
+      "id": "node-no-results",
+      "name": "Slack — No New Data",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1560, 440],
+      "credentials": { "slackOAuth2Api": { "name": "Slack account" } },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "id", "value": "C0AVDB0S7TL" },
+        "text": "=ℹ️ *WF13 — OSHA Import* · No new construction inspections since last run\n_{{ $now.toISO() }}_"
+      }
+    },
+    {
+      "id": "node-update-watermark-empty",
+      "name": "Update sync_state (no rows)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1780, 440],
+      "credentials": { "postgres": { "id": "egOLTpUjmoIDA785", "name": "supabase-postgres" } },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.sync_state\nSET last_run_at = NOW(), rows_synced = 0, last_error = NULL, updated_at = NOW()\nWHERE workflow_id = 'wf13';"
+      }
+    }
+  ],
+  "connections": {
+    "Daily 6 AM":            { "main": [[{ "node": "Get Watermark",              "type": "main", "index": 0 }]] },
+    "Get Watermark":         { "main": [[{ "node": "Set Fetch Params",           "type": "main", "index": 0 }]] },
+    "Set Fetch Params":      { "main": [[{ "node": "Fetch Inspections",          "type": "main", "index": 0 }]] },
+    "Fetch Inspections":     { "main": [[{ "node": "Filter Inspections",         "type": "main", "index": 0 }]] },
+    "Filter Inspections":    { "main": [[{ "node": "Any Results?",               "type": "main", "index": 0 }]] },
+    "Any Results?": {
+      "main": [
+        [{ "node": "Fetch Violations",            "type": "main", "index": 0 }],
+        [{ "node": "Slack — No New Data",         "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Violations":      { "main": [[{ "node": "Join & Enrich",              "type": "main", "index": 0 }]] },
+    "Join & Enrich":         { "main": [[{ "node": "Upsert osha_violations",     "type": "main", "index": 0 }]] },
+    "Upsert osha_violations":{ "main": [[{ "node": "New Rows Only",              "type": "main", "index": 0 }]] },
+    "New Rows Only":         { "main": [[{ "node": "promote_osha_to_lead",       "type": "main", "index": 0 }]] },
+    "promote_osha_to_lead":  { "main": [[{ "node": "Count Synced",               "type": "main", "index": 0 }]] },
+    "Count Synced":          { "main": [[{ "node": "Update sync_state",          "type": "main", "index": 0 }]] },
+    "Update sync_state":     { "main": [[{ "node": "Slack — Import Done",        "type": "main", "index": 0 }]] },
+    "Slack — No New Data":   { "main": [[{ "node": "Update sync_state (no rows)","type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "ylOdF4oZn4lgMqON"
+  },
+  "staticData": null,
+  "tags": []
+}

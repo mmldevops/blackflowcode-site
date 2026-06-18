@@ -1,0 +1,219 @@
+{
+  "name": "BFC - Workflow 6 - Cert Expiration Checker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "73d247dd-a781-4a6e-bb0f-857c51344585",
+      "name": "Daily 6 AM CST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -880,
+        128
+      ],
+      "notes": "Cron: 0 6 * * * — daily at 06:00 server time (OrbStack). Adjust if you change timezone preference."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM public.scan_expiring_certs();",
+        "options": {}
+      },
+      "id": "1cf6f16f-31ec-436e-8c26-7b5269316397",
+      "name": "Scan Expiring Certs (RPC)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -656,
+        128
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Calls public.scan_expiring_certs() function. Returns counts: alerts_created, alerts_escalated, alerts_cured, certs_scanned, level_1_count, level_2_count, level_3_count. Pure idempotent function — safe to call multiple times per day."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the function output into Slack-ready and log-ready payloads.\nconst result = $input.first().json;\n\nconst total_alerts = (result.alerts_created || 0) + (result.alerts_escalated || 0);\nconst has_activity = total_alerts > 0 || (result.alerts_cured || 0) > 0;\n\n// Severity classifier for Slack icon\nlet severity_icon = '✅';\nif ((result.level_3_count || 0) > 0) severity_icon = '🚨';\nelse if ((result.level_2_count || 0) > 0) severity_icon = '⚠️';\nelse if ((result.level_1_count || 0) > 0) severity_icon = '📋';\n\nreturn [{\n  json: {\n    // Summary fields\n    alerts_created: result.alerts_created || 0,\n    alerts_escalated: result.alerts_escalated || 0,\n    alerts_cured: result.alerts_cured || 0,\n    certs_scanned: result.certs_scanned || 0,\n    level_1_count: result.level_1_count || 0,\n    level_2_count: result.level_2_count || 0,\n    level_3_count: result.level_3_count || 0,\n    total_alerts: total_alerts,\n    has_activity: has_activity,\n    severity_icon: severity_icon,\n    \n    // Metadata\n    run_timestamp: new Date().toISOString(),\n    run_date: new Date().toISOString().split('T')[0],\n    n8n_execution_id: $execution.id,\n    n8n_workflow_id: $workflow.id\n  }\n}];"
+      },
+      "id": "44444266-1645-4048-a509-5946f97766e2",
+      "name": "Format Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-has-activity",
+              "leftValue": "={{ $json.has_activity }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d92cfd3e-28ab-4acb-8a05-96e964b3a620",
+      "name": "Has Activity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        128
+      ],
+      "notes": "Skip Slack post on quiet days (no creates/escalates/cures). Reduces channel noise."
+    },
+    {
+      "parameters": {
+        "text": "{{ $json.severity_icon }} *Daily Cert Expiration Scan*\n\n| Metric | Count |\n|---|---|\n| Certs scanned | {{ $json.certs_scanned }} |\n| Alerts created | {{ $json.alerts_created }} |\n| Alerts escalated | {{ $json.alerts_escalated }} |\n| Alerts cured (cert renewed) | {{ $json.alerts_cured }} |\n\n*By severity*\n• Level 3 (expired): {{ $json.level_3_count }}\n• Level 2 (≤7 days): {{ $json.level_2_count }}\n• Level 1 (≤30 days): {{ $json.level_1_count }}\n\n_Run: {{ $json.run_timestamp }} · Execution: `{{ $json.n8n_execution_id }}`_",
+        "otherOptions": {}
+      },
+      "id": "ae791eeb-c774-4f11-b46a-5294e24896c6",
+      "name": "Slack: Daily Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "8d4aa6fd-65e1-4f35-b283-8e53d975f068",
+      "notes": "Posts to #bfc-compliance-alerts (C0B0ZT3P79R). Same channel as Workflow 1 alerts and error handler. Severity icon adapts to highest level detected."
+    },
+    {
+      "parameters": {},
+      "id": "64d9201d-bf31-4773-a633-bda492967795",
+      "name": "No Activity (Skip)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "2665f4ab-a565-49c5-9e9d-aea0eaffd3b2",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        224,
+        128
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 6 AM CST": {
+      "main": [
+        [
+          {
+            "node": "Scan Expiring Certs (RPC)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan Expiring Certs (RPC)": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Has Activity?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Activity?": {
+      "main": [
+        [
+          {
+            "node": "Slack: Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Activity (Skip)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Daily Summary": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Activity (Skip)": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false,
+  "_id": "C8w0FLcHn3SGLxeF",
+  "_tags": [
+    "cert-checker",
+    "system-1-core",
+    "bfc-compliance"
+  ]
+}

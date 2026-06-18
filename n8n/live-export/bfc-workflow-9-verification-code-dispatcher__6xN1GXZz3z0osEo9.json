@@ -1,0 +1,244 @@
+{
+  "name": "BFC — Workflow 9 — Verification Code Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds"
+            }
+          ]
+        }
+      },
+      "id": "db7e9c30-9ec4-4f97-bdd8-3a8428ad9e33",
+      "name": "01 · Schedule · Every 30s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Polls verification_dispatch_queue every 30 seconds. Acceptable latency for a 6-digit code with 10-min expiry."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Claim up to 25 pending rows in one shot.\n-- FOR UPDATE SKIP LOCKED prevents two concurrent runs claiming the same row.\n-- attempts < 5 caps retry storm on permanent failures.\nWITH claimed AS (\n  SELECT id\n  FROM verification_dispatch_queue\n  WHERE dispatched_at IS NULL\n    AND expires_at > now()\n    AND attempts < 5\n  ORDER BY created_at ASC\n  LIMIT 25\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE verification_dispatch_queue q\nSET attempts = attempts + 1\nFROM claimed\nWHERE q.id = claimed.id\nRETURNING q.id, q.token, q.recipient, q.code_cleartext, q.expires_at, q.attempts;",
+        "options": {}
+      },
+      "id": "a2133033-78cc-41a3-b084-823d3232307f",
+      "name": "02 · Postgres · Claim Pending Codes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        208,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Atomic claim: increments attempts, returns rows in same statement. If this query returns 0 rows, the downstream nodes don't run (n8n short-circuits empty arrays)."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a-html",
+              "name": "email_html",
+              "value": "=<!DOCTYPE html>\n<html><body style=\"margin:0;padding:0;background:#F4F4F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F4F4F0;padding:40px 20px;\">\n<tr><td align=\"center\">\n<table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#FFFFFF;border-radius:6px;overflow:hidden;\">\n<tr><td style=\"background:#07080B;padding:18px 28px;\">\n<table cellpadding=\"0\" cellspacing=\"0\"><tr>\n<td style=\"width:30px;height:30px;background:#B8E532;border-radius:6px;text-align:center;vertical-align:middle;font-family:'Courier New',monospace;font-weight:700;color:#07080B;font-size:14pt;\">&gt;_</td>\n<td style=\"padding-left:10px;color:#FFFFFF;font-weight:700;font-size:13pt;letter-spacing:-0.01em;\">Blackflowcode<span style=\"color:#B8E532;\">.ai</span></td>\n</tr></table>\n</td></tr>\n<tr><td style=\"padding:32px 28px;\">\n<div style=\"font-family:'Courier New',monospace;font-size:9pt;color:#5E7B1F;text-transform:uppercase;letter-spacing:0.16em;margin-bottom:14px;\">VERIFICATION · UPLOAD ACCESS</div>\n<h1 style=\"margin:0 0 14px;font-size:22pt;letter-spacing:-0.01em;color:#07080B;\">Your verification code.</h1>\n<p style=\"margin:0 0 24px;font-size:11pt;line-height:1.55;color:#2A2F38;\">Enter this 6-digit code on the upload page to confirm it&rsquo;s you. The code is valid for 10 minutes.</p>\n<div style=\"font-family:'Courier New',monospace;font-size:32pt;font-weight:700;letter-spacing:0.4em;color:#07080B;background:#F6FAEC;border-left:3px solid #B8E532;padding:24px 0;text-align:center;border-radius:0 4px 4px 0;margin:0 0 24px;\">{{ $json.code_cleartext }}</div>\n<p style=\"margin:0 0 8px;font-size:10pt;color:#4D5B6E;\">If you didn&rsquo;t request this code, you can ignore this email &mdash; the upload link won&rsquo;t do anything without it.</p>\n</td></tr>\n<tr><td style=\"background:#F6FAEC;padding:18px 28px;border-top:1px solid #ECEFF3;font-family:'Courier New',monospace;font-size:8.5pt;color:#5E7B1F;text-transform:uppercase;letter-spacing:0.14em;\">\nBlackflowcode.ai &middot; hello@blackflowcodeai.com &middot; 516.604.1804\n</td></tr>\n</table>\n</td></tr></table>\n</body></html>",
+              "type": "string"
+            },
+            {
+              "id": "a-text",
+              "name": "email_text",
+              "value": "=Your Blackflowcode.ai verification code: {{ $json.code_cleartext }}\n\nEnter this 6-digit code on the upload page to confirm it's you. Valid for 10 minutes.\n\nIf you didn't request this code, ignore this email.\n\n— Blackflowcode.ai · hello@blackflowcodeai.com · 516.604.1804",
+              "type": "string"
+            },
+            {
+              "id": "a-subj",
+              "name": "email_subject",
+              "value": "=Your verification code: {{ $json.code_cleartext }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6d731b30-c59d-430b-951f-32515af80e45",
+      "name": "03 · Set · Build Email Body",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        0
+      ],
+      "notes": "Renders lime-themed HTML and plain text alternates. Subject includes the code so it's previewable in inbox notification without opening."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mailgun.net/v3/notifications.blackflowcodeai.com/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mailgunApi",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "from",
+              "value": "Blackflowcode <notifications@notifications.blackflowcodeai.com>"
+            },
+            {
+              "name": "to",
+              "value": "={{ $('02 · Postgres · Claim Pending Codes').item.json.recipient }}"
+            },
+            {
+              "name": "h:Reply-To",
+              "value": "hello@blackflowcodeai.com"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $('03 · Set · Build Email Body').item.json.email_subject }}"
+            },
+            {
+              "name": "html",
+              "value": "={{ $('03 · Set · Build Email Body').item.json.email_html }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $('03 · Set · Build Email Body').item.json.email_text }}"
+            },
+            {
+              "name": "o:tag",
+              "value": "bfc-sub"
+            },
+            {
+              "name": "o:tag",
+              "value": "verification-code"
+            },
+            {
+              "name": "o:tracking-clicks",
+              "value": "no"
+            },
+            {
+              "name": "o:tracking-opens",
+              "value": "yes"
+            },
+            {
+              "name": "v:queue_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "v:token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "9a1d8af7-91a6-404a-a5eb-1e454109db4f",
+      "name": "04 · HTTP · Mailgun Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        608,
+        0
+      ],
+      "credentials": {
+        "mailgunApi": {
+          "id": "7vh4hZcq2pjM5NcG",
+          "name": "Production Notification"
+        }
+      },
+      "notes": "Hardcoded Mailgun config (no $env.* — N8N_BLOCK_ENV_ACCESS_IN_NODE is on). Form-encoded body REQUIRED so v:* custom variables round-trip to event webhooks. Tracking-clicks=no because there are no clickable links in a verification code email; tracking-opens=yes for deliverability metrics."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Mark dispatched. attempts was already incremented during the claim step\n-- so a successful path here means the row is final. If Mailgun returned\n-- non-2xx, n8n's HTTP node would have thrown before reaching this node.\nUPDATE verification_dispatch_queue\nSET dispatched_at = now(),\n    last_error = NULL\nWHERE id = NULLIF($1, 'null')::uuid\nRETURNING id, dispatched_at;",
+        "options": {
+          "queryReplacement": "={{ $('02 · Postgres · Claim Pending Codes').item.json.id }}"
+        }
+      },
+      "id": "8c56a431-3ae7-4d7f-bdc6-352441b77897",
+      "name": "05 · Postgres · Mark Dispatched",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        800,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Success path. NULLIF guard mirrors Workflow 8/8b convention against n8n string-null bug. Failure path is handled by Error Workflow + the attempts counter (claim step incremented it; if we never reach this node, attempts stays incremented and the row will be retried up to 5 times)."
+    }
+  ],
+  "connections": {
+    "01 · Schedule · Every 30s": {
+      "main": [
+        [
+          {
+            "node": "02 · Postgres · Claim Pending Codes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 · Postgres · Claim Pending Codes": {
+      "main": [
+        [
+          {
+            "node": "03 · Set · Build Email Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 · Set · Build Email Body": {
+      "main": [
+        [
+          {
+            "node": "04 · HTTP · Mailgun Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 · HTTP · Mailgun Send": {
+      "main": [
+        [
+          {
+            "node": "05 · Postgres · Mark Dispatched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "ylOdF4oZn4lgMqON"
+  },
+  "active": true,
+  "_id": "6xN1GXZz3z0osEo9",
+  "_tags": [
+    "bfc-prod",
+    "bfc-sub"
+  ]
+}

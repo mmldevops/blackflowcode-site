@@ -1,0 +1,423 @@
+{
+  "name": "BFC - System 1 - Monthly Report Delivery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "node-cron-monthly",
+      "name": "1st of Month 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lsgtllwlgcleraokdyfe.supabase.co/rest/v1/rpc/refresh_evidence_reports",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "node-refresh-rpt",
+      "name": "Node 1.5 - Refresh Report Tables",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4nRJASvFJd3fXLqZ",
+          "name": "supabase-service-role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vercel.com/v1/integrations/deploy/YOUR_VERCEL_HOOK_ID",
+        "options": {}
+      },
+      "id": "node-vercel-deploy",
+      "name": "Node 2 - Vercel Deploy Hook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "node-wait",
+      "name": "Node 3 - Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        300
+      ],
+      "webhookId": "wait-monthly-report"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chrome.browserless.io/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_BROWSERLESS_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"url\": \"https://reports.blackflowcodeai.com/construction-compliance\",\n  \"options\": {\n    \"format\": \"A4\",\n    \"printBackground\": true,\n    \"margin\": { \"top\": \"24px\", \"bottom\": \"24px\", \"left\": \"20px\", \"right\": \"20px\" }\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "node-browserless",
+      "name": "Node 4 - Browserless PDF Capture",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://lsgtllwlgcleraokdyfe.supabase.co/auth/v1/admin/generateLink",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"magiclink\",\n  \"email\": \"{{ $vars.client_email || 'hello@blackflowcode.ai' }}\",\n  \"options\": {\n    \"redirectTo\": \"https://reports.blackflowcodeai.com/construction-compliance\"\n  }\n}",
+        "options": {}
+      },
+      "id": "node-generate-link",
+      "name": "Node 5 - Supabase Generate Magic Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4nRJASvFJd3fXLqZ",
+          "name": "supabase-service-role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const linkResponse = $input.first().json;\nconst magicLink = linkResponse.action_link || linkResponse.properties?.action_link || '';\nconst expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();\n\nreturn [{\n  json: {\n    magic_link: magicLink,\n    magic_link_expires_at: expiresAt,\n    client_email: $vars.client_email || 'hello@blackflowcode.ai',\n    client_id: $vars.client_id || 'acme-gc-001',\n    report_month: new Date().toISOString().substring(0, 7) + '-01',\n    report_url: 'https://reports.blackflowcodeai.com/construction-compliance'\n  }\n}];"
+      },
+      "id": "node-code-link",
+      "name": "Node 5.5 - Extract Magic Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.client_email }}",
+        "subject": "=Your {{ $now.toFormat('MMMM yyyy') }} Compliance Report — blackflowcode.ai",
+        "emailType": "html",
+        "message": "=<div style=\"font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #07080B; color: #ffffff; padding: 40px;\">\n\n<div style=\"margin-bottom: 32px;\">\n  <span style=\"font-family: monospace; font-size: 11px; letter-spacing: 0.12em; color: #D4A843; text-transform: uppercase;\">blackflowcode.ai</span>\n</div>\n\n<h1 style=\"font-size: 24px; font-weight: 700; margin-bottom: 12px; color: #ffffff;\">Your {{ $now.toFormat('MMMM yyyy') }} Compliance Report is Ready</h1>\n\n<p style=\"color: #8896AA; line-height: 1.7; margin-bottom: 28px;\">Your monthly subcontractor compliance report has been generated and is ready for review. Click the button below to access your secure, personalized report.</p>\n\n<div style=\"margin-bottom: 32px;\">\n  <a href=\"{{ $json.magic_link }}\" style=\"display: inline-block; background: #D4A843; color: #07080B; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 14px; letter-spacing: 0.06em;\">VIEW YOUR REPORT →</a>\n</div>\n\n<p style=\"color: #4D5B6E; font-size: 12px; font-family: monospace;\">This link expires in 24 hours. If you need a new link, contact hello@blackflowcode.ai</p>\n\n<hr style=\"border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 32px 0;\" />\n\n<p style=\"color: #4D5B6E; font-size: 12px;\">Neno Gaspard · blackflowcode.ai · hello@blackflowcode.ai</p>\n\n</div>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          },
+          "fromName": "Neno at blackflowcode.ai"
+        }
+      },
+      "id": "node-gmail-report",
+      "name": "Node 6 - Gmail Send Report Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "2CtjqsPu2rgXHYzi",
+          "name": "Gmail account"
+        }
+      },
+      "webhookId": "61712ec9-c8c7-4f51-b013-96485a23ddaa"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://nocodb.n8n-stack.orb.local/api/v1/db/data/noco/YOUR_PROJECT_ID/YOUR_TABLE_ID",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"client_id\": \"{{ $json.client_id }}\",\n  \"client_email\": \"{{ $json.client_email }}\",\n  \"report_type\": \"Construction Compliance\",\n  \"report_month\": \"{{ $json.report_month }}\",\n  \"report_url\": \"{{ $json.report_url }}\",\n  \"magic_link_sent\": true,\n  \"magic_link_expires_at\": \"{{ $json.magic_link_expires_at }}\",\n  \"magic_link_redirected_to\": \"/construction-compliance\",\n  \"pdf_generated\": true,\n  \"pdf_storage_path\": \"reports/{{ $json.client_id }}/{{ $now.toFormat('yyyy-MM') }}.pdf\",\n  \"pdf_signed_url_expires_at\": \"{{ $json.magic_link_expires_at }}\",\n  \"email_sent\": true,\n  \"email_provider\": \"Gmail\",\n  \"status\": \"Delivered\",\n  \"n8n_execution_id\": \"{{ $execution.id }}\",\n  \"sent_at\": \"{{ $now.toISO() }}\",\n  \"refreshed_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "node-nocodb-log",
+      "name": "Node 7 - NocoDB Log Delivery",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "DAIfyZIpk10DCDgz",
+          "name": "nocodb-api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://lsgtllwlgcleraokdyfe.supabase.co/storage/v1/object/reports/{{ $('Node 5.5 - Extract Magic Link').first().json.client_id }}/{{ $now.toFormat('yyyy-MM') }}.pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/pdf"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "node-storage-put",
+      "name": "Node 8 - Supabase Storage Archive PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2220,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4nRJASvFJd3fXLqZ",
+          "name": "supabase-service-role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=✅ *Monthly Report Delivery Complete*\n\n| Step | Status |\n|---|---|\n| Report tables refreshed | ✅ |\n| Vercel rebuild triggered | ✅ |\n| PDF captured | ✅ |\n| Magic link generated | ✅ |\n| Email sent | ✅ |\n| NocoDB logged | ✅ |\n| Supabase Storage archived | ✅ |\n\n_Client: {{ $('Node 5.5 - Extract Magic Link').first().json.client_email }}_\n_Month: {{ $now.toFormat('MMMM yyyy') }}_\n_Execution: {{ $execution.id }}_",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "C0B0ZT3P79R"
+        },
+        "authentication": "oAuth2"
+      },
+      "id": "node-slack-done",
+      "name": "Slack - Delivery Complete",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2440,
+        300
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "7753a215-4609-4400-968d-d13d7d859401"
+    }
+  ],
+  "connections": {
+    "1st of Month 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Node 1.5 - Refresh Report Tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 1.5 - Refresh Report Tables": {
+      "main": [
+        [
+          {
+            "node": "Node 2 - Vercel Deploy Hook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 2 - Vercel Deploy Hook": {
+      "main": [
+        [
+          {
+            "node": "Node 3 - Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 3 - Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Node 4 - Browserless PDF Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 4 - Browserless PDF Capture": {
+      "main": [
+        [
+          {
+            "node": "Node 5 - Supabase Generate Magic Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 5 - Supabase Generate Magic Link": {
+      "main": [
+        [
+          {
+            "node": "Node 5.5 - Extract Magic Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 5.5 - Extract Magic Link": {
+      "main": [
+        [
+          {
+            "node": "Node 6 - Gmail Send Report Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 6 - Gmail Send Report Email": {
+      "main": [
+        [
+          {
+            "node": "Node 7 - NocoDB Log Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 7 - NocoDB Log Delivery": {
+      "main": [
+        [
+          {
+            "node": "Node 8 - Supabase Storage Archive PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Node 8 - Supabase Storage Archive PDF": {
+      "main": [
+        [
+          {
+            "node": "Slack - Delivery Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "BFC - Error Handler"
+  },
+  "active": false,
+  "_id": "Cz2ds5hv3WCX65cs",
+  "_tags": []
+}

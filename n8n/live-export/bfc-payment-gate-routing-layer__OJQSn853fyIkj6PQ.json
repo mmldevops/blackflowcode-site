@@ -1,0 +1,445 @@
+{
+  "name": "BFC - Payment Gate - Routing Layer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-gate-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ac215c55-af6f-4a33-8359-006338972473",
+      "name": "Webhook (POST site_order_id)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        -48
+      ],
+      "webhookId": "7b6b7327-84a2-4d7e-932e-01653df15bb0",
+      "notes": "Accepts {site_order_id, triggered_by, triggered_by_detail}. triggered_by must be 'manual' | 'cron' | 'procore_webhook' | 'api'. For testing: trigger manually via n8n editor or POST with body {\"site_order_id\":\"aaaaaaaa-0001-0001-0001-000000000001\",\"triggered_by\":\"manual\",\"triggered_by_detail\":\"test from editor\"}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate input and normalize for downstream nodes.\nconst body = $input.first().json.body || $input.first().json;\n\nconst site_order_id = body.site_order_id;\nconst triggered_by = body.triggered_by || 'manual';\nconst triggered_by_detail = body.triggered_by_detail || 'no detail provided';\n\n// Hard validate site_order_id format\nconst uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!site_order_id || !uuidRegex.test(site_order_id)) {\n  throw new Error(`Invalid or missing site_order_id: ${site_order_id}. Must be UUID.`);\n}\n\nconst validTriggers = ['manual', 'cron', 'procore_webhook', 'api'];\nif (!validTriggers.includes(triggered_by)) {\n  throw new Error(`Invalid triggered_by: ${triggered_by}. Must be one of: ${validTriggers.join(', ')}`);\n}\n\nreturn [{\n  json: {\n    site_order_id,\n    triggered_by,\n    triggered_by_detail,\n    n8n_execution_id: $execution.id,\n    n8n_workflow_id: $workflow.id\n  }\n}];"
+      },
+      "id": "7eea850b-bbd5-4648-9657-567f6246ce95",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1536,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM public.check_payment_eligibility($1::uuid);",
+        "options": {
+          "queryReplacement": "={{ $json.site_order_id }}"
+        }
+      },
+      "id": "cc711ab8-6144-4d6b-8e45-5d38305dfab5",
+      "name": "Call check_payment_eligibility()",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -1312,
+        -48
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Pure compliance check via Supabase RPC. Returns is_eligible, subcontractor_id, ap_integration_type, blocking_alert_count, blocking_alert_levels, reason. Per ADR-001."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge validated input + eligibility result into one payload for branching.\nconst input = $('Validate Input').first().json;\nconst result = $input.first().json;\n\nreturn [{\n  json: {\n    // Echo input\n    site_order_id: input.site_order_id,\n    triggered_by: input.triggered_by,\n    triggered_by_detail: input.triggered_by_detail,\n    n8n_execution_id: input.n8n_execution_id,\n    n8n_workflow_id: input.n8n_workflow_id,\n    \n    // Function output\n    is_eligible: result.is_eligible,\n    subcontractor_id: result.subcontractor_id,\n    ap_integration_type: result.ap_integration_type,\n    blocking_alert_count: result.blocking_alert_count || 0,\n    blocking_alert_levels: result.blocking_alert_levels || [],\n    reason: result.reason\n  }\n}];"
+      },
+      "id": "f4a04b74-e787-4b3d-b87f-b292f5a98a4d",
+      "name": "Merge Decision Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "cond-eligible",
+              "leftValue": "={{ $json.is_eligible }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "12ff1de3-8f98-405c-8d3e-faa5af7fef39",
+      "name": "Eligible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "cond-procore",
+                    "leftValue": "={{ $json.ap_integration_type }}",
+                    "rightValue": "procore",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "cond-qb",
+                    "leftValue": "={{ $json.ap_integration_type }}",
+                    "rightValue": "quickbooks",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ad829b39-cdb9-4711-b675-1b4eb1ffcaf2",
+      "name": "Route by AP Integration",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -656,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PROCORE branch: Eligible sub on Procore-wired GC.\n// Today this is a STUB that logs the decision but doesn't actually call Procore's payment-release API.\n// Replace this with a real Procore HTTP Request node when:\n//   1. integration_configs has the Procore client_secret_vault_id wired\n//   2. The Procore Payments API endpoint and auth flow are confirmed\n//\n// For now: returns a structured action result that downstream audit-log can record.\n\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    ...input,\n    action_taken: 'released_via_procore',\n    action_detail: {\n      integration: 'procore',\n      stub: true,\n      stub_reason: 'Procore Payments API integration not yet built. Decision recorded for audit; manual release required.',\n      next_step: 'Operator should manually release in Procore until API integration ships.'\n    },\n    status: 'pending'\n  }\n}];"
+      },
+      "id": "b70cf34c-6430-4065-a934-19f4630f533b",
+      "name": "Procore: Release Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// QUICKBOOKS branch: Eligible sub on QB-wired GC.\n// Stub for the same reason as Procore - QB integration not yet built.\n// First QB customer signing triggers building this branch out properly.\n\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    ...input,\n    action_taken: 'released_via_quickbooks',\n    action_detail: {\n      integration: 'quickbooks',\n      stub: true,\n      stub_reason: 'QuickBooks Payments API integration not yet built. Decision recorded for audit; manual release required.',\n      next_step: 'Operator should manually release in QuickBooks until API integration ships.'\n    },\n    status: 'pending'\n  }\n}];"
+      },
+      "id": "3e46090f-2dc0-41b1-aaa0-00483d6ee476",
+      "name": "QuickBooks: Release Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MANUAL branch: Eligible sub but ap_integration_type is 'manual' or NULL.\n// Always requires human intervention; not a bug.\n\nconst input = $input.first().json;\n\nreturn [{\n  json: {\n    ...input,\n    action_taken: 'released_manual_review',\n    action_detail: {\n      integration: 'manual',\n      next_step: 'Sub flagged for manual payment release. AP team to action via their normal process.'\n    },\n    status: 'pending'\n  }\n}];"
+      },
+      "id": "c18a81e6-9ffb-46cc-9532-9fb569278a71",
+      "name": "Manual: Flag for Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// BLOCKED branch: Sub ineligible. Compose the GC alert payload.\n// One Slack message per decision. Channel = #bfc-compliance-alerts (where Workflow 1 already posts).\n\nconst input = $input.first().json;\n\nconst levelsStr = (input.blocking_alert_levels || []).join(', ');\n\nreturn [{\n  json: {\n    ...input,\n    action_taken: 'blocked_alert_sent',\n    action_detail: {\n      slack_channel: 'C0B0ZT3P79R',\n      message_summary: `Payment blocked for site_order ${input.site_order_id}: sub has ${input.blocking_alert_count} active alert(s) at level(s) ${levelsStr}.`,\n      reason: input.reason\n    },\n    status: 'pending'\n  }\n}];"
+      },
+      "id": "cad919c1-7469-4f36-811c-db4ca4240667",
+      "name": "Compose Block Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B0ZT3P79R",
+          "mode": "list",
+          "cachedResultName": "bfc-compliance-alerts"
+        },
+        "text": "🚫 *Payment Gate: BLOCKED*\n\n| Field | Value |\n|---|---|\n| *Site Order* | `{{ $json.site_order_id }}` |\n| *Subcontractor* | `{{ $json.subcontractor_id }}` |\n| *Active Alerts* | {{ $json.blocking_alert_count }} (level(s): {{ $json.blocking_alert_levels.join(', ') }}) |\n| *Reason* | `{{ $json.reason }}` |\n| *Trigger* | {{ $json.triggered_by }} — {{ $json.triggered_by_detail }} |\n| *AP Path* | {{ $json.ap_integration_type || 'unknown' }} |\n\n_Recorded: payment_decisions table · Execution: `{{ $json.n8n_execution_id }}`_",
+        "otherOptions": {}
+      },
+      "id": "1deaded5-5f2b-44a9-aea3-3da5adca2d3d",
+      "name": "Slack: Compliance Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        112
+      ],
+      "webhookId": "22705adb-4b3c-4f51-b2b1-0fe279841958",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.payment_decisions (\n  site_order_id,\n  subcontractor_id,\n  triggered_by,\n  triggered_by_detail,\n  is_eligible,\n  ap_integration_type,\n  blocking_alert_count,\n  blocking_alert_levels,\n  reason,\n  action_taken,\n  action_detail,\n  status,\n  n8n_execution_id,\n  n8n_workflow_id,\n  completed_at\n) VALUES (\n  '{{ $('Merge Decision Context').first().json.site_order_id }}'::uuid,\n  '{{ $('Merge Decision Context').first().json.subcontractor_id }}'::uuid,\n  '{{ $('Merge Decision Context').first().json.triggered_by }}',\n  '{{ ($('Merge Decision Context').first().json.triggered_by_detail || '').replace(/'/g, \"''\") }}',\n  {{ $('Merge Decision Context').first().json.is_eligible }}::boolean,\n  {{ $('Merge Decision Context').first().json.ap_integration_type ? \"'\" + $('Merge Decision Context').first().json.ap_integration_type + \"'::ap_integration_type_enum\" : 'NULL' }},\n  {{ $('Merge Decision Context').first().json.blocking_alert_count }}::int,\n  ARRAY[{{ ($('Merge Decision Context').first().json.blocking_alert_levels || []).join(',') }}]::int[],\n  '{{ ($('Merge Decision Context').first().json.reason || '').replace(/'/g, \"''\") }}',\n  '{{ $('Merge Decision Context').first().json.is_eligible ? ($('Merge Decision Context').first().json.ap_integration_type === 'procore' ? 'released_via_procore' : $('Merge Decision Context').first().json.ap_integration_type === 'quickbooks' ? 'released_via_quickbooks' : 'released_manual_review') : 'blocked_alert_sent' }}',\n  '{{ JSON.stringify({ is_eligible: $('Merge Decision Context').first().json.is_eligible, ap_integration_type: $('Merge Decision Context').first().json.ap_integration_type, blocking_alert_count: $('Merge Decision Context').first().json.blocking_alert_count, blocking_alert_levels: $('Merge Decision Context').first().json.blocking_alert_levels, reason: $('Merge Decision Context').first().json.reason, decision_source: 'derived_from_merge_context' }).replace(/'/g, \"''\") }}'::jsonb,\n  'completed',\n  '{{ $('Merge Decision Context').first().json.n8n_execution_id }}',\n  '{{ $('Merge Decision Context').first().json.n8n_workflow_id }}',\n  NOW()\n) RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.site_order_id }},={{ $json.subcontractor_id }},={{ $json.triggered_by }},={{ $json.triggered_by_detail }},={{ $json.is_eligible }},={{ $json.ap_integration_type }},={{ $json.blocking_alert_count }},={{ '{' + ($json.blocking_alert_levels || []).join(',') + '}' }},={{ $json.reason }},={{ $json.action_taken }},={{ JSON.stringify($json.action_detail) }},={{ $json.n8n_execution_id }},={{ $json.n8n_workflow_id }}"
+        }
+      },
+      "id": "12be3bf0-22bf-4246-9fdd-631a1cb112ca",
+      "name": "Audit: payment_decisions INSERT",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        -208,
+        -48
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "All branches converge here. Single audit row per decision, regardless of routing path. Status='completed' since action was already dispatched upstream."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "c868b5b1-e2b3-4369-84e8-091f09ae98da",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        -48
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook (POST site_order_id)": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Call check_payment_eligibility()",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call check_payment_eligibility()": {
+      "main": [
+        [
+          {
+            "node": "Merge Decision Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Decision Context": {
+      "main": [
+        [
+          {
+            "node": "Eligible?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eligible?": {
+      "main": [
+        [
+          {
+            "node": "Route by AP Integration",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compose Block Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by AP Integration": {
+      "main": [
+        [
+          {
+            "node": "Procore: Release Payment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "QuickBooks: Release Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Procore: Release Payment": {
+      "main": [
+        [
+          {
+            "node": "Audit: payment_decisions INSERT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QuickBooks: Release Payment": {
+      "main": [
+        [
+          {
+            "node": "Audit: payment_decisions INSERT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual: Flag for Review": {
+      "main": [
+        [
+          {
+            "node": "Audit: payment_decisions INSERT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Block Alert": {
+      "main": [
+        [
+          {
+            "node": "Slack: Compliance Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Compliance Alert": {
+      "main": [
+        [
+          {
+            "node": "Audit: payment_decisions INSERT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit: payment_decisions INSERT": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "active": false,
+  "_id": "OJQSn853fyIkj6PQ",
+  "_tags": [
+    "payment-gateway",
+    "payment-gate",
+    "system-1-core",
+    "bfc-compliance"
+  ]
+}

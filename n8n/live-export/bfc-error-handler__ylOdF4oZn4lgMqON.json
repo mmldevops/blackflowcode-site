@@ -1,0 +1,130 @@
+{
+  "name": "BFC - Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// v2 parser — robust extraction with dual fallback, node-type capture, and message truncation.\n// Replaces the v1 string-only `lastNodeExecuted` extraction.\n\nconst err = $input.first().json;\nconst execution = err.execution || {};\nconst trigger = err.execution?.error || err.error || {};\n\nconst workflowName = err.workflow?.name || 'Unknown workflow';\nconst workflowId = err.workflow?.id || '';\n\nconst lastNode = trigger.node?.name\n             || err.execution?.lastNodeExecuted\n             || 'unknown';\nconst lastNodeType = trigger.node?.type || 'unknown';\n\nconst rawMessage = trigger.message\n              || trigger.description\n              || 'No error message available';\nconst message = String(rawMessage).substring(0, 1000);\n\n// Optional: capture a short snippet of the failing item's data, if present.\n// Useful for diagnosing data-shape issues. Stays under JSONB sanity.\nlet payloadSnippet = null;\ntry {\n  const itemContext = trigger.context?.itemIndex !== undefined\n    ? trigger.context\n    : null;\n  if (itemContext) {\n    const snippet = JSON.stringify(itemContext).substring(0, 500);\n    payloadSnippet = JSON.parse(snippet.endsWith('}') ? snippet : snippet + '\"}');\n  }\n} catch (e) {\n  payloadSnippet = null;\n}\n\nreturn [{\n  json: {\n    workflow_name: workflowName,\n    workflow_id: workflowId,\n    execution_id: execution.id || '',\n    execution_url: execution.url || '',\n    failed_node_name: lastNode,\n    failed_node_type: lastNodeType,\n    error_message: message,\n    payload_snippet: payloadSnippet,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-format",
+      "name": "Format Error Detail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.n8n_failures (workflow_id, workflow_name, execution_id, execution_url, failed_node_name, failed_node_type, error_message, payload_snippet) VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, $6, $7, $8::jsonb) RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.workflow_id }},={{ $json.workflow_name }},={{ $json.execution_id }},={{ $json.execution_url }},={{ $json.failed_node_name }},={{ $json.failed_node_type }},={{ $json.error_message }},={{ $json.payload_snippet ? JSON.stringify($json.payload_snippet) : null }}"
+        }
+      },
+      "id": "node-supabase-log",
+      "name": "Supabase - Log Failure",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        688,
+        304
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      },
+      "notes": "Writes to public.n8n_failures in bfc-subcontractor-demo. Table created 2026-05-04. Replaces the v1 NocoDB placeholder node. RETURNING id is captured but unused; useful for future cross-references."
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B0ZT3P79R",
+          "mode": "list",
+          "cachedResultName": "bfc-compliance-alerts"
+        },
+        "text": "=🚨 *Workflow `{{ $('Format Error Detail').first().json.workflow_name }}` FAILED*\n\n*Failed Node:* `{{ $('Format Error Detail').first().json.failed_node_name }}`\n*Node Type:* `{{ $('Format Error Detail').first().json.failed_node_type }}`\n*Execution ID:* `{{ $('Format Error Detail').first().json.execution_id }}`\n*Workflow ID:* `{{ $('Format Error Detail').first().json.workflow_id }}`\n*Time:* {{ $('Format Error Detail').first().json.timestamp }}\n*Logged:* `n8n_failures.id = {{ $json.id }}`\n\n*Error:*",
+        "otherOptions": {}
+      },
+      "id": "node-slack-alert",
+      "name": "Slack #bfc-compliance-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        912,
+        304
+      ],
+      "webhookId": "66844a51-e400-4df3-9491-6cb8bd4c9854",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5hkIvm7alWjzpl3O",
+          "name": "Slack account"
+        }
+      },
+      "notes": "Reads parsed values from Format Error Detail (upstream) and the inserted row ID from Supabase - Log Failure (immediate previous). Slack credential type matches the existing live workflow (slackOAuth2Api), not the newer slackApi credential."
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Detail": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Log Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Log Failure": {
+      "main": [
+        [
+          {
+            "node": "Slack #bfc-compliance-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "binaryMode": "separate"
+  },
+  "active": true,
+  "_id": "ylOdF4oZn4lgMqON",
+  "_tags": [
+    "bfc-error-handler",
+    "infrastructure"
+  ]
+}

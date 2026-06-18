@@ -1,0 +1,375 @@
+{
+  "name": "BFC — Report Delivery (Email + SMS)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bfc-report-delivery",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "notes": "POST body: { user_id (uuid), client_id (text), client_email, report_type, report_month (YYYY-MM-DD) }",
+      "id": "b3b89ded-0925-425b-a454-8cda0e03b251",
+      "webhookId": "46429dce-6318-4253-9ad5-3f3ac3fe9f38"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT delivery_method, phone_number FROM user_notification_preferences WHERE user_id = NULLIF($1, 'null')::uuid LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $json.body.user_id }}"
+        }
+      },
+      "name": "Postgres — Fetch User Prefs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        470,
+        300
+      ],
+      "id": "f8c22a47-1399-44df-a70d-443b3c68f719",
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prefs = $input.item.json;\nconst wb    = $('Webhook').item.json.body;\n\nreturn [{\n  json: {\n    user_id:         wb.user_id,\n    client_id:       wb.client_id,\n    client_email:    wb.client_email,\n    report_type:     wb.report_type,\n    report_month:    wb.report_month,\n    delivery_method: prefs.delivery_method ?? 'email',\n    phone_number:    prefs.phone_number    ?? null,\n  }\n}];\n"
+      },
+      "name": "Code — Normalize Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        300
+      ],
+      "notes": "Merges webhook body + DB prefs into one flat object",
+      "id": "3b366034-b34f-47b4-bf7a-bf0efa1b94b6"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env[\"NEXT_PUBLIC_SITE_URL\"]}}/api/auth/evidence-link",
+        "options": {},
+        "notes": "Requires HTTP Header Auth credential pointing to your service-role key. Configure credential in n8n before activating.",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "name": "HTTP Request — Magic Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        910,
+        300
+      ],
+      "id": "d8b9665d-205d-49e8-9fef-b2b7ff554f06",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4nRJASvFJd3fXLqZ",
+          "name": "supabase-service-role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data     = $('Code — Normalize Data').item.json;\nconst linkData = $input.item.json;\n\nconst expiresAt = new Date();\nexpiresAt.setMinutes(expiresAt.getMinutes() + 30);\n\nreturn [{\n  json: {\n    ...data,\n    magic_link:            linkData.url   ?? null,\n    magic_link_expires_at: expiresAt.toISOString(),\n  }\n}];"
+      },
+      "name": "Code — Add Magic Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1130,
+        300
+      ],
+      "id": "08ce66f3-fb47-43f2-8296-8dcf4945e8a3"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json[\"delivery_method\"]}}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "email"
+            },
+            {
+              "value2": "sms"
+            },
+            {
+              "value2": "both"
+            }
+          ]
+        }
+      },
+      "name": "Switch — Delivery Method",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        300
+      ],
+      "notes": "Output 0 = email | Output 1 = sms | Output 2 = both (fans to Mailgun AND Vonage)",
+      "id": "111b3a42-0519-4aec-9c40-c216b1218f47"
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications@blackflowcodeai.com",
+        "toEmail": "={{$node[\"Code — Add Magic Link\"].json[\"client_email\"]}}",
+        "subject": "=Your BFC {{$node[\"Code — Add Magic Link\"].json[\"report_type\"]}} Report is Ready",
+        "text": "=Hello,\n\nYour BFC compliance report is ready to view:\n\n{{$node[\"Code — Add Magic Link\"].json[\"magic_link\"]}}\n\nThis link expires in 30 minutes.\n\n— BFC Compliance Team",
+        "options": {}
+      },
+      "name": "Mailgun — Send Email",
+      "type": "n8n-nodes-base.mailgun",
+      "typeVersion": 1,
+      "position": [
+        1570,
+        160
+      ],
+      "id": "8904e896-7e73-44c0-9714-620cb9b2d52c",
+      "credentials": {
+        "mailgunApi": {
+          "id": "oaCDzXHxGfEEBG4M",
+          "name": "BFC-Mailgun-Prod"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rest.nexmo.com/sms/json",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{$env[\"VONAGE_API_KEY\"]}}"
+            },
+            {
+              "name": "api_secret",
+              "value": "={{$env[\"VONAGE_API_SECRET\"]}}"
+            },
+            {
+              "name": "to",
+              "value": "={{$node[\"Code — Add Magic Link\"].json[\"phone_number\"]}}"
+            },
+            {
+              "name": "from",
+              "value": "={{$env[\"VONAGE_FROM_NUMBER\"]}}"
+            },
+            {
+              "name": "text",
+              "value": "=BFC: Your {{$node[\"Code — Add Magic Link\"].json[\"report_type\"]}} report is ready. View (expires 30 min): {{$node[\"Code — Add Magic Link\"].json[\"magic_link\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "HTTP Request — Vonage SMS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1570,
+        440
+      ],
+      "id": "834bef72-867e-492e-8fdb-c2551028803b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Code — Add Magic Link').item.json;\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            true,\n    email_provider:        'mailgun',\n    sms_sent:              false,\n    status:                'Sent',\n    n8n_execution_id:      $execution.id,\n  }\n}];"
+      },
+      "name": "Code — Prep Email Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1790,
+        160
+      ],
+      "id": "0f26eb1d-d1c7-4f34-aae2-b1d890da0e6a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d      = $('Code — Add Magic Link').item.json;\nconst vonage = $input.item.json;\nconst msg    = vonage?.messages?.[0];\nconst ok     = msg?.status === '0';\n\nreturn [{\n  json: {\n    client_id:             d.client_id,\n    client_email:          d.client_email,\n    report_type:           d.report_type,\n    report_month:          d.report_month,\n    report_url:            d.magic_link,\n    magic_link_sent:       true,\n    magic_link_expires_at: d.magic_link_expires_at,\n    email_sent:            false,\n    sms_sent:              ok,\n    sms_provider:          'vonage',\n    status:                ok ? 'Sent' : 'Failed',\n    failure_reason:        ok ? null : (msg?.['error-text'] ?? 'Unknown Vonage error'),\n    n8n_execution_id:      $execution.id,\n  }\n}];"
+      },
+      "name": "Code — Prep SMS Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1790,
+        440
+      ],
+      "id": "903c0ff9-eaaf-4521-83ff-e47926142830"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO report_delivery_log\n  (client_id, client_email, report_type, report_month, report_url,\n   magic_link_sent, magic_link_expires_at,\n   email_sent, email_provider,\n   sms_sent, sms_provider,\n   status, failure_reason, n8n_execution_id)\nVALUES\n  ($1, $2, $3,\n   NULLIF($4, 'null')::date,\n   NULLIF($5, 'null'),\n   $6::boolean, NULLIF($7, 'null')::timestamptz,\n   $8::boolean, NULLIF($9, 'null'),\n   $10::boolean, NULLIF($11, 'null'),\n   $12, NULLIF($13, 'null'), NULLIF($14, 'null'))\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $json.client_id }},{{ $json.client_email }},{{ $json.report_type }},{{ $json.report_month }},{{ $json.report_url }},{{ $json.magic_link_sent }},{{ $json.magic_link_expires_at }},{{ $json.email_sent }},{{ $json.email_provider }},{{ $json.sms_sent }},{{ $json.sms_provider }},{{ $json.status }},{{ $json.failure_reason }},{{ $json.n8n_execution_id }}"
+        }
+      },
+      "name": "Postgres — Log Delivery",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2010,
+        300
+      ],
+      "id": "eaf34f93-07d5-420d-afee-c0255a345a5f",
+      "credentials": {
+        "postgres": {
+          "id": "egOLTpUjmoIDA785",
+          "name": "supabase-postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres — Fetch User Prefs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres — Fetch User Prefs": {
+      "main": [
+        [
+          {
+            "node": "Code — Normalize Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Normalize Data": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request — Magic Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request — Magic Link": {
+      "main": [
+        [
+          {
+            "node": "Code — Add Magic Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Add Magic Link": {
+      "main": [
+        [
+          {
+            "node": "Switch — Delivery Method",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch — Delivery Method": {
+      "main": [
+        [
+          {
+            "node": "Mailgun — Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request — Vonage SMS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mailgun — Send Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request — Vonage SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mailgun — Send Email": {
+      "main": [
+        [
+          {
+            "node": "Code — Prep Email Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request — Vonage SMS": {
+      "main": [
+        [
+          {
+            "node": "Code — Prep SMS Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Prep Email Log": {
+      "main": [
+        [
+          {
+            "node": "Postgres — Log Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Prep SMS Log": {
+      "main": [
+        [
+          {
+            "node": "Postgres — Log Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "errorWorkflow": "ylOdF4oZn4lgMqON"
+  },
+  "active": true,
+  "_id": "TtHS3jRa1TCXQjV9",
+  "_tags": []
+}
